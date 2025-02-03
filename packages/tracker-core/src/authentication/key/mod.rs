@@ -44,8 +44,6 @@ use std::panic::Location;
 use std::sync::Arc;
 use std::time::Duration;
 
-use rand::distr::Alphanumeric;
-use rand::{rng, Rng};
 use thiserror::Error;
 use torrust_tracker_clock::clock::Time;
 use torrust_tracker_located_error::{DynError, LocatedError};
@@ -82,24 +80,20 @@ pub fn generate_permanent_key() -> PeerKey {
 /// * `lifetime`: if `None` the key will be permanent.
 #[must_use]
 pub fn generate_key(lifetime: Option<Duration>) -> PeerKey {
-    let random_id: String = rng()
-        .sample_iter(&Alphanumeric)
-        .take(AUTH_KEY_LENGTH)
-        .map(char::from)
-        .collect();
+    let random_key = Key::random();
 
     if let Some(lifetime) = lifetime {
-        tracing::debug!("Generated key: {}, valid for: {:?} seconds", random_id, lifetime);
+        tracing::debug!("Generated key: {}, valid for: {:?} seconds", random_key, lifetime);
 
         PeerKey {
-            key: random_id.parse::<Key>().unwrap(),
+            key: random_key,
             valid_until: Some(CurrentClock::now_add(&lifetime).unwrap()),
         }
     } else {
-        tracing::debug!("Generated key: {}, permanent", random_id);
+        tracing::debug!("Generated key: {}, permanent", random_key);
 
         PeerKey {
-            key: random_id.parse::<Key>().unwrap(),
+            key: random_key,
             valid_until: None,
         }
     }

@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
 use derive_more::Display;
+use rand::distr::Alphanumeric;
+use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use torrust_tracker_clock::conv::convert_from_timestamp_to_datetime_utc;
@@ -74,6 +76,20 @@ impl Key {
         Ok(Self(value.to_owned()))
     }
 
+    /// It generates a random key.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the random number generator fails to generate a valid key.
+    pub fn random() -> Self {
+        let random_id: String = rng()
+            .sample_iter(&Alphanumeric)
+            .take(AUTH_KEY_LENGTH)
+            .map(char::from)
+            .collect();
+        random_id.parse::<Key>().expect("Failed to generate a valid random key")
+    }
+
     #[must_use]
     pub fn value(&self) -> &str {
         &self.0
@@ -131,6 +147,11 @@ mod tests {
         }
 
         #[test]
+        fn should_be_generated_randomly() {
+            let _key = Key::random();
+        }
+
+        #[test]
         fn length_should_be_32() {
             let key = Key::new("");
             assert!(key.is_err());
@@ -155,70 +176,66 @@ mod tests {
     }
 
     mod peer_key {
-        use std::str::FromStr;
+
         use std::time::Duration;
 
-        use torrust_tracker_clock::clock;
-        use torrust_tracker_clock::clock::stopped::Stopped as _;
-
-        use crate::authentication;
+        use crate::authentication::key::peer_key::{Key, PeerKey};
 
         #[test]
-        fn should_be_parsed_from_an_string() {
-            let key_string = "YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ";
-            let auth_key = authentication::Key::from_str(key_string);
+        fn could_have_an_expiration_time() {
+            let expiring_key = PeerKey {
+                key: Key::random(),
+                valid_until: Some(Duration::from_secs(100)),
+            };
 
-            assert!(auth_key.is_ok());
-            assert_eq!(auth_key.unwrap().to_string(), key_string);
+            assert_eq!(expiring_key.expiry_time().unwrap().to_string(), "1970-01-01 00:01:40 UTC");
         }
 
         #[test]
-        fn should_be_displayed_when_it_is_expiring() {
-            // Set the time to the current time.
-            clock::Stopped::local_set_to_unix_epoch();
+        fn could_be_permanent() {
+            let permanent_key = PeerKey {
+                key: Key::random(),
+                valid_until: None,
+            };
 
-            let expiring_key = authentication::key::generate_key(Some(Duration::from_secs(0)));
-
-            assert_eq!(
-                expiring_key.to_string(),
-                format!("key: `{}`, valid until `1970-01-01 00:00:00 UTC`", expiring_key.key) // cspell:disable-line
-            );
+            assert_eq!(permanent_key.expiry_time(), None);
         }
 
-        #[test]
-        fn should_be_displayed_when_it_is_permanent() {
-            let expiring_key = authentication::key::generate_permanent_key();
+        mod expiring {
+            use std::time::Duration;
 
-            assert_eq!(
-                expiring_key.to_string(),
-                format!("key: `{}`, permanent", expiring_key.key) // cspell:disable-line
-            );
+            use crate::authentication::key::peer_key::{Key, PeerKey};
+
+            #[test]
+            fn should_be_displayed_when_it_is_expiring() {
+                let expiring_key = PeerKey {
+                    key: Key::random(),
+                    valid_until: Some(Duration::from_secs(100)),
+                };
+
+                assert_eq!(
+                    expiring_key.to_string(),
+                    format!("key: `{}`, valid until `1970-01-01 00:01:40 UTC`", expiring_key.key) // cspell:disable-line
+                );
+            }
         }
 
-        #[test]
-        fn should_be_generated_with_a_expiration_time() {
-            let expiring_key = authentication::key::generate_key(Some(Duration::new(9999, 0)));
+        mod permanent {
 
-            assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
-        }
+            use crate::authentication::key::peer_key::{Key, PeerKey};
 
-        #[test]
-        fn should_be_generate_and_verified() {
-            // Set the time to the current time.
-            clock::Stopped::local_set_to_system_time_now();
+            #[test]
+            fn should_be_displayed_when_it_is_permanent() {
+                let permanent_key = PeerKey {
+                    key: Key::random(),
+                    valid_until: None,
+                };
 
-            // Make key that is valid for 19 seconds.
-            let expiring_key = authentication::key::generate_key(Some(Duration::from_secs(19)));
-
-            // Mock the time has passed 10 sec.
-            clock::Stopped::local_add(&Duration::from_secs(10)).unwrap();
-
-            assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
-
-            // Mock the time has passed another 10 sec.
-            clock::Stopped::local_add(&Duration::from_secs(10)).unwrap();
-
-            assert!(authentication::key::verify_key_expiration(&expiring_key).is_err());
+                assert_eq!(
+                    permanent_key.to_string(),
+                    format!("key: `{}`, permanent", permanent_key.key) // cspell:disable-line
+                );
+            }
         }
     }
 }
