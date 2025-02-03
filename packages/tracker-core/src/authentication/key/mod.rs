@@ -134,11 +134,13 @@ pub enum Error {
     KeyVerificationError {
         source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
     },
+
     #[error("Failed to read key: {key}, {location}")]
     UnableToReadKey {
         location: &'static Location<'static>,
         key: Box<Key>,
     },
+
     #[error("Key has expired, {location}")]
     KeyExpired { location: &'static Location<'static> },
 }
@@ -154,7 +156,7 @@ impl From<r2d2_sqlite::rusqlite::Error> for Error {
 #[cfg(test)]
 mod tests {
 
-    mod expiring_auth_key {
+    mod the_expiring_peer_key {
 
         use std::time::Duration;
 
@@ -184,7 +186,7 @@ mod tests {
         }
 
         #[test]
-        fn should_be_generate_and_verified() {
+        fn expiration_verification_should_fail_when_the_key_has_expired() {
             // Set the time to the current time.
             clock::Stopped::local_set_to_system_time_now();
 
@@ -200,6 +202,46 @@ mod tests {
             clock::Stopped::local_add(&Duration::from_secs(10)).unwrap();
 
             assert!(authentication::key::verify_key_expiration(&expiring_key).is_err());
+        }
+    }
+
+    mod the_permanent_peer_key {
+
+        use std::time::Duration;
+
+        use torrust_tracker_clock::clock;
+        use torrust_tracker_clock::clock::stopped::Stopped as _;
+
+        use crate::authentication;
+
+        #[test]
+        fn should_be_displayed() {
+            // Set the time to the current time.
+            clock::Stopped::local_set_to_unix_epoch();
+
+            let expiring_key = authentication::key::generate_key(Some(Duration::from_secs(0)));
+
+            assert_eq!(
+                expiring_key.to_string(),
+                format!("key: `{}`, valid until `1970-01-01 00:00:00 UTC`", expiring_key.key) // cspell:disable-line
+            );
+        }
+
+        #[test]
+        fn should_be_generated_without_expiration_time() {
+            let expiring_key = authentication::key::generate_permanent_key();
+
+            assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
+        }
+
+        #[test]
+        fn expiration_verification_should_always_succeed() {
+            let expiring_key = authentication::key::generate_permanent_key();
+
+            // Mock the time has passed 10 years.
+            clock::Stopped::local_add(&Duration::from_secs(10 * 365 * 24 * 60 * 60)).unwrap();
+
+            assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
         }
     }
 }
