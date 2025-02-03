@@ -37,24 +37,25 @@
 //!
 //! assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
 //! ```
+pub mod peer_key;
 pub mod repository;
 
 use std::panic::Location;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use derive_more::Display;
 use rand::distr::Alphanumeric;
 use rand::{rng, Rng};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use torrust_tracker_clock::clock::Time;
-use torrust_tracker_clock::conv::convert_from_timestamp_to_datetime_utc;
 use torrust_tracker_located_error::{DynError, LocatedError};
 use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
 use crate::CurrentClock;
+
+pub type PeerKey = peer_key::PeerKey;
+pub type Key = peer_key::Key;
+pub type ParseKeyError = peer_key::ParseKeyError;
 
 /// HTTP tracker authentication key length.
 ///
@@ -130,110 +131,6 @@ pub fn verify_key_expiration(auth_key: &PeerKey) -> Result<(), Error> {
     }
 }
 
-/// An authentication key which can potentially have an expiration time.
-/// After that time is will automatically become invalid.
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
-pub struct PeerKey {
-    /// Random 32-char string. For example: `YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ`
-    pub key: Key,
-
-    /// Timestamp, the key will be no longer valid after this timestamp.
-    /// If `None` the keys will not expire (permanent key).
-    pub valid_until: Option<DurationSinceUnixEpoch>,
-}
-
-impl std::fmt::Display for PeerKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.expiry_time() {
-            Some(expire_time) => write!(f, "key: `{}`, valid until `{}`", self.key, expire_time),
-            None => write!(f, "key: `{}`, permanent", self.key),
-        }
-    }
-}
-
-impl PeerKey {
-    #[must_use]
-    pub fn key(&self) -> Key {
-        self.key.clone()
-    }
-
-    /// It returns the expiry time. For example, for the starting time for Unix Epoch
-    /// (timestamp 0) it will return a `DateTime` whose string representation is
-    /// `1970-01-01 00:00:00 UTC`.
-    ///
-    /// # Panics
-    ///
-    /// Will panic when the key timestamp overflows the internal i64 type.
-    /// (this will naturally happen in 292.5 billion years)
-    #[must_use]
-    pub fn expiry_time(&self) -> Option<chrono::DateTime<chrono::Utc>> {
-        self.valid_until.map(convert_from_timestamp_to_datetime_utc)
-    }
-}
-
-/// A token used for authentication.
-///
-/// - It contains only ascii alphanumeric chars: lower and uppercase letters and
-///   numbers.
-/// - It's a 32-char string.
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Display, Hash)]
-pub struct Key(String);
-
-impl Key {
-    /// # Errors
-    ///
-    /// Will return an error is the string represents an invalid key.
-    /// Valid keys can only contain 32 chars including 0-9, a-z and A-Z.
-    pub fn new(value: &str) -> Result<Self, ParseKeyError> {
-        if value.len() != AUTH_KEY_LENGTH {
-            return Err(ParseKeyError::InvalidKeyLength);
-        }
-
-        if !value.chars().all(|c| c.is_ascii_alphanumeric()) {
-            return Err(ParseKeyError::InvalidChars);
-        }
-
-        Ok(Self(value.to_owned()))
-    }
-
-    #[must_use]
-    pub fn value(&self) -> &str {
-        &self.0
-    }
-}
-
-/// Error returned when a key cannot be parsed from a string.
-///
-/// ```text
-/// use bittorrent_tracker_core::authentication::Key;
-/// use std::str::FromStr;
-///
-/// let key_string = "YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ";
-/// let key = Key::from_str(key_string);
-///
-/// assert!(key.is_ok());
-/// assert_eq!(key.unwrap().to_string(), key_string);
-/// ```
-///
-/// If the string does not contains a valid key, the parser function will return
-/// this error.
-#[derive(Debug, Error)]
-pub enum ParseKeyError {
-    #[error("Invalid key length. Key must be have 32 chars")]
-    InvalidKeyLength,
-    #[error("Invalid chars for key. Key can only alphanumeric chars (0-9, a-z, A-Z)")]
-    InvalidChars,
-}
-
-impl FromStr for Key {
-    type Err = ParseKeyError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Key::new(s)?;
-        Ok(Self(s.to_string()))
-    }
-}
-
 /// Verification error. Error returned when an [`PeerKey`] cannot be
 /// verified with the (`crate::authentication::verify_key`) function.
 #[derive(Debug, Error)]
@@ -263,54 +160,14 @@ impl From<r2d2_sqlite::rusqlite::Error> for Error {
 #[cfg(test)]
 mod tests {
 
-    mod key {
-        use std::str::FromStr;
-
-        use crate::authentication::Key;
-
-        #[test]
-        fn should_be_parsed_from_an_string() {
-            let key_string = "YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ";
-            let key = Key::from_str(key_string);
-
-            assert!(key.is_ok());
-            assert_eq!(key.unwrap().to_string(), key_string);
-        }
-
-        #[test]
-        fn length_should_be_32() {
-            let key = Key::new("");
-            assert!(key.is_err());
-
-            let string_longer_than_32 = "012345678901234567890123456789012"; // DevSkim: ignore  DS173237
-            let key = Key::new(string_longer_than_32);
-            assert!(key.is_err());
-        }
-
-        #[test]
-        fn should_only_include_alphanumeric_chars() {
-            let key = Key::new("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-            assert!(key.is_err());
-        }
-    }
-
     mod expiring_auth_key {
-        use std::str::FromStr;
+
         use std::time::Duration;
 
         use torrust_tracker_clock::clock;
         use torrust_tracker_clock::clock::stopped::Stopped as _;
 
         use crate::authentication;
-
-        #[test]
-        fn should_be_parsed_from_an_string() {
-            let key_string = "YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ";
-            let auth_key = authentication::Key::from_str(key_string);
-
-            assert!(auth_key.is_ok());
-            assert_eq!(auth_key.unwrap().to_string(), key_string);
-        }
 
         #[test]
         fn should_be_displayed() {
