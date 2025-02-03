@@ -99,6 +99,7 @@ impl Key {
 pub enum ParseKeyError {
     #[error("Invalid key length. Key must be have 32 chars")]
     InvalidKeyLength,
+
     #[error("Invalid chars for key. Key can only alphanumeric chars (0-9, a-z, A-Z)")]
     InvalidChars,
 }
@@ -144,9 +145,16 @@ mod tests {
             let key = Key::new("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
             assert!(key.is_err());
         }
+
+        #[test]
+        fn should_return_a_reference_to_the_inner_string() {
+            let key = Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(); // DevSkim: ignore  DS173237
+
+            assert_eq!(key.value(), "YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ"); // DevSkim: ignore  DS173237
+        }
     }
 
-    mod expiring_auth_key {
+    mod peer_key {
         use std::str::FromStr;
         use std::time::Duration;
 
@@ -165,7 +173,7 @@ mod tests {
         }
 
         #[test]
-        fn should_be_displayed() {
+        fn should_be_displayed_when_it_is_expiring() {
             // Set the time to the current time.
             clock::Stopped::local_set_to_unix_epoch();
 
@@ -174,6 +182,16 @@ mod tests {
             assert_eq!(
                 expiring_key.to_string(),
                 format!("key: `{}`, valid until `1970-01-01 00:00:00 UTC`", expiring_key.key) // cspell:disable-line
+            );
+        }
+
+        #[test]
+        fn should_be_displayed_when_it_is_permanent() {
+            let expiring_key = authentication::key::generate_permanent_key();
+
+            assert_eq!(
+                expiring_key.to_string(),
+                format!("key: `{}`, permanent", expiring_key.key) // cspell:disable-line
             );
         }
 
