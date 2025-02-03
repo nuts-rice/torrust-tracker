@@ -11,6 +11,8 @@ use super::Database;
 /// Will panic if database cannot be initialized.
 #[must_use]
 pub fn initialize_database(config: &Configuration) -> Arc<Box<dyn Database>> {
+    // todo: inject only core configuration
+
     let driver = match config.core.database.driver {
         database::Driver::Sqlite3 => Driver::Sqlite3,
         database::Driver::MySQL => Driver::MySQL,
