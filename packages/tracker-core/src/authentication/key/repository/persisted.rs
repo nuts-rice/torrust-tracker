@@ -64,7 +64,7 @@ mod tests {
         fn persist_a_new_peer_key() {
             let configuration = configuration::ephemeral_public();
 
-            let database = initialize_database(&configuration);
+            let database = initialize_database(&configuration.core);
 
             let repository = DatabaseKeyRepository::new(&database);
 
@@ -82,7 +82,7 @@ mod tests {
         fn remove_a_persisted_peer_key() {
             let configuration = configuration::ephemeral_public();
 
-            let database = initialize_database(&configuration);
+            let database = initialize_database(&configuration.core);
 
             let repository = DatabaseKeyRepository::new(&database);
 
@@ -102,7 +102,7 @@ mod tests {
         fn load_all_persisted_peer_keys() {
             let configuration = configuration::ephemeral_public();
 
-            let database = initialize_database(&configuration);
+            let database = initialize_database(&configuration.core);
 
             let repository = DatabaseKeyRepository::new(&database);
 

@@ -266,7 +266,7 @@ mod tests {
         }
 
         fn instantiate_keys_handler_with_configuration(config: &Configuration) -> KeysHandler {
-            let database = initialize_database(config);
+            let database = initialize_database(&config.core);
             let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
             let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
 

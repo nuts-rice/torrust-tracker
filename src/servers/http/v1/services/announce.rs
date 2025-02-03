@@ -84,7 +84,7 @@ mod tests {
         let config = configuration::ephemeral_public();
 
         let core_config = Arc::new(config.core.clone());
-        let database = initialize_database(&config);
+        let database = initialize_database(&config.core);
         let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
         let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
 
@@ -173,7 +173,7 @@ mod tests {
         fn initialize_announce_handler() -> Arc<AnnounceHandler> {
             let config = configuration::ephemeral();
 
-            let database = initialize_database(&config);
+            let database = initialize_database(&config.core);
             let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
             let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
 

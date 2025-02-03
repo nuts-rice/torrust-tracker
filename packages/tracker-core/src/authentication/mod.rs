@@ -49,7 +49,7 @@ mod tests {
         fn instantiate_keys_manager_and_authentication_with_configuration(
             config: &Configuration,
         ) -> (Arc<KeysHandler>, Arc<AuthenticationService>) {
-            let database = initialize_database(config);
+            let database = initialize_database(&config.core);
             let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
             let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
             let authentication_service = Arc::new(service::AuthenticationService::new(&config.core, &in_memory_key_repository));

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use torrust_tracker_configuration::v2_0_0::database;
-use torrust_tracker_configuration::Configuration;
+use torrust_tracker_configuration::Core;
 
 use super::driver::{self, Driver};
 use super::Database;
@@ -10,13 +9,11 @@ use super::Database;
 ///
 /// Will panic if database cannot be initialized.
 #[must_use]
-pub fn initialize_database(config: &Configuration) -> Arc<Box<dyn Database>> {
-    // todo: inject only core configuration
-
-    let driver = match config.core.database.driver {
-        database::Driver::Sqlite3 => Driver::Sqlite3,
-        database::Driver::MySQL => Driver::MySQL,
+pub fn initialize_database(config: &Core) -> Arc<Box<dyn Database>> {
+    let driver = match config.database.driver {
+        torrust_tracker_configuration::Driver::Sqlite3 => Driver::Sqlite3,
+        torrust_tracker_configuration::Driver::MySQL => Driver::MySQL,
     };
 
-    Arc::new(driver::build(&driver, &config.core.database.path).expect("Database driver build failed."))
+    Arc::new(driver::build(&driver, &config.database.path).expect("Database driver build failed."))
 }
