@@ -65,9 +65,12 @@ mod tests {
         async fn it_should_remove_an_authentication_key() {
             let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-            let expiring_key = keys_manager.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+            let expiring_key = keys_manager
+                .generate_expiring_peer_key(Some(Duration::from_secs(100)))
+                .await
+                .unwrap();
 
-            let result = keys_manager.remove_auth_key(&expiring_key.key()).await;
+            let result = keys_manager.remove_peer_key(&expiring_key.key()).await;
 
             assert!(result.is_ok());
 
@@ -79,12 +82,15 @@ mod tests {
         async fn it_should_load_authentication_keys_from_the_database() {
             let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-            let expiring_key = keys_manager.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+            let expiring_key = keys_manager
+                .generate_expiring_peer_key(Some(Duration::from_secs(100)))
+                .await
+                .unwrap();
 
             // Remove the newly generated key in memory
             keys_manager.remove_in_memory_auth_key(&expiring_key.key()).await;
 
-            let result = keys_manager.load_keys_from_database().await;
+            let result = keys_manager.load_peer_keys_from_database().await;
 
             assert!(result.is_ok());
 
@@ -107,7 +113,10 @@ mod tests {
                 async fn it_should_authenticate_a_peer_with_the_key() {
                     let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-                    let peer_key = keys_manager.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+                    let peer_key = keys_manager
+                        .generate_expiring_peer_key(Some(Duration::from_secs(100)))
+                        .await
+                        .unwrap();
 
                     let result = authentication_service.authenticate(&peer_key.key()).await;
 
@@ -122,7 +131,7 @@ mod tests {
                     let past_timestamp = Duration::ZERO;
 
                     let peer_key = keys_manager
-                        .add_auth_key(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(), Some(past_timestamp))
+                        .add_expiring_peer_key(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(), Some(past_timestamp))
                         .await
                         .unwrap();
 
@@ -183,7 +192,7 @@ mod tests {
                 async fn it_should_authenticate_a_peer_with_the_key() {
                     let (keys_manager, authentication_service) = instantiate_keys_manager_and_authentication();
 
-                    let peer_key = keys_manager.generate_permanent_auth_key().await.unwrap();
+                    let peer_key = keys_manager.generate_permanent_peer_key().await.unwrap();
 
                     let result = authentication_service.authenticate(&peer_key.key()).await;
 

@@ -160,7 +160,7 @@ async fn should_allow_deleting_an_auth_key() {
     let auth_key = env
         .http_api_container
         .keys_handler
-        .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
+        .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
 
@@ -295,7 +295,7 @@ async fn should_fail_when_the_auth_key_cannot_be_deleted() {
     let auth_key = env
         .http_api_container
         .keys_handler
-        .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
+        .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
 
@@ -329,7 +329,7 @@ async fn should_not_allow_deleting_an_auth_key_for_unauthenticated_users() {
     let auth_key = env
         .http_api_container
         .keys_handler
-        .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
+        .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
 
@@ -350,7 +350,7 @@ async fn should_not_allow_deleting_an_auth_key_for_unauthenticated_users() {
     let auth_key = env
         .http_api_container
         .keys_handler
-        .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
+        .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
 
@@ -379,7 +379,7 @@ async fn should_allow_reloading_keys() {
     let seconds_valid = 60;
     env.http_api_container
         .keys_handler
-        .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
+        .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
 
@@ -405,7 +405,7 @@ async fn should_fail_when_keys_cannot_be_reloaded() {
 
     env.http_api_container
         .keys_handler
-        .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
+        .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
 
@@ -434,7 +434,7 @@ async fn should_not_allow_reloading_keys_for_unauthenticated_users() {
     let seconds_valid = 60;
     env.http_api_container
         .keys_handler
-        .generate_auth_key(Some(Duration::from_secs(seconds_valid)))
+        .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
         .await
         .unwrap();
 

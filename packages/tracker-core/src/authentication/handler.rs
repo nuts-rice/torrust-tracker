@@ -54,8 +54,6 @@ impl KeysHandler {
     /// - The provided pre-generated key is invalid.
     /// - The key could not been persisted due to database issues.
     pub async fn add_peer_key(&self, add_key_req: AddKeyRequest) -> Result<PeerKey, PeerKeyError> {
-        // code-review: all methods related to keys should be moved to a new independent "keys" service.
-
         match add_key_req.opt_key {
             // Upload pre-generated key
             Some(pre_existing_key) => {
@@ -68,7 +66,7 @@ impl KeysHandler {
                     let key = pre_existing_key.parse::<Key>();
 
                     match key {
-                        Ok(key) => match self.add_auth_key(key, Some(valid_until)).await {
+                        Ok(key) => match self.add_expiring_peer_key(key, Some(valid_until)).await {
                             Ok(auth_key) => Ok(auth_key),
                             Err(err) => Err(PeerKeyError::DatabaseError {
                                 source: Located(err).into(),
@@ -84,7 +82,7 @@ impl KeysHandler {
                     let key = pre_existing_key.parse::<Key>();
 
                     match key {
-                        Ok(key) => match self.add_permanent_auth_key(key).await {
+                        Ok(key) => match self.add_permanent_peer_key(key).await {
                             Ok(auth_key) => Ok(auth_key),
                             Err(err) => Err(PeerKeyError::DatabaseError {
                                 source: Located(err).into(),
@@ -100,14 +98,17 @@ impl KeysHandler {
             // Generate a new random key
             None => match add_key_req.opt_seconds_valid {
                 // Expiring key
-                Some(seconds_valid) => match self.generate_auth_key(Some(Duration::from_secs(seconds_valid))).await {
+                Some(seconds_valid) => match self
+                    .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
+                    .await
+                {
                     Ok(auth_key) => Ok(auth_key),
                     Err(err) => Err(PeerKeyError::DatabaseError {
                         source: Located(err).into(),
                     }),
                 },
                 // Permanent key
-                None => match self.generate_permanent_auth_key().await {
+                None => match self.generate_permanent_peer_key().await {
                     Ok(auth_key) => Ok(auth_key),
                     Err(err) => Err(PeerKeyError::DatabaseError {
                         source: Located(err).into(),
@@ -124,8 +125,8 @@ impl KeysHandler {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to add the `auth_key` to the database.
-    pub async fn generate_permanent_auth_key(&self) -> Result<PeerKey, databases::error::Error> {
-        self.generate_auth_key(None).await
+    pub async fn generate_permanent_peer_key(&self) -> Result<PeerKey, databases::error::Error> {
+        self.generate_expiring_peer_key(None).await
     }
 
     /// It generates a new expiring authentication key.
@@ -140,7 +141,7 @@ impl KeysHandler {
     ///
     /// * `lifetime` - The duration in seconds for the new key. The key will be
     ///   no longer valid after `lifetime` seconds.
-    pub async fn generate_auth_key(&self, lifetime: Option<Duration>) -> Result<PeerKey, databases::error::Error> {
+    pub async fn generate_expiring_peer_key(&self, lifetime: Option<Duration>) -> Result<PeerKey, databases::error::Error> {
         let peer_key = key::generate_key(lifetime);
 
         self.db_key_repository.add(&peer_key)?;
@@ -162,8 +163,8 @@ impl KeysHandler {
     /// # Arguments
     ///
     /// * `key` - The pre-generated key.
-    pub async fn add_permanent_auth_key(&self, key: Key) -> Result<PeerKey, databases::error::Error> {
-        self.add_auth_key(key, None).await
+    pub async fn add_permanent_peer_key(&self, key: Key) -> Result<PeerKey, databases::error::Error> {
+        self.add_expiring_peer_key(key, None).await
     }
 
     /// It adds a pre-generated authentication key.
@@ -180,7 +181,7 @@ impl KeysHandler {
     /// * `key` - The pre-generated key.
     /// * `lifetime` - The duration in seconds for the new key. The key will be
     ///   no longer valid after `lifetime` seconds.
-    pub async fn add_auth_key(
+    pub async fn add_expiring_peer_key(
         &self,
         key: Key,
         valid_until: Option<DurationSinceUnixEpoch>,
@@ -202,7 +203,7 @@ impl KeysHandler {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to remove the `key` to the database.
-    pub async fn remove_auth_key(&self, key: &Key) -> Result<(), databases::error::Error> {
+    pub async fn remove_peer_key(&self, key: &Key) -> Result<(), databases::error::Error> {
         self.db_key_repository.remove(key)?;
 
         self.remove_in_memory_auth_key(key).await;
@@ -223,7 +224,7 @@ impl KeysHandler {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to `load_keys` from the database.
-    pub async fn load_keys_from_database(&self) -> Result<(), databases::error::Error> {
+    pub async fn load_peer_keys_from_database(&self) -> Result<(), databases::error::Error> {
         let keys_from_database = self.db_key_repository.load_keys()?;
 
         self.in_memory_key_repository.reset_with(keys_from_database).await;
@@ -287,7 +288,10 @@ mod tests {
                 async fn it_should_generate_the_key() {
                     let keys_handler = instantiate_keys_handler();
 
-                    let peer_key = keys_handler.generate_auth_key(Some(Duration::from_secs(100))).await.unwrap();
+                    let peer_key = keys_handler
+                        .generate_expiring_peer_key(Some(Duration::from_secs(100)))
+                        .await
+                        .unwrap();
 
                     assert_eq!(
                         peer_key.valid_until,
@@ -335,7 +339,7 @@ mod tests {
                 async fn it_should_generate_the_key() {
                     let keys_handler = instantiate_keys_handler();
 
-                    let peer_key = keys_handler.generate_permanent_auth_key().await.unwrap();
+                    let peer_key = keys_handler.generate_permanent_peer_key().await.unwrap();
 
                     assert_eq!(peer_key.valid_until, None);
                 }

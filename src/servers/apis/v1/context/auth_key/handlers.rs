@@ -70,7 +70,10 @@ pub async fn generate_auth_key_handler(
     Path(seconds_valid_or_key): Path<u64>,
 ) -> Response {
     let seconds_valid = seconds_valid_or_key;
-    match keys_handler.generate_auth_key(Some(Duration::from_secs(seconds_valid))).await {
+    match keys_handler
+        .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
+        .await
+    {
         Ok(auth_key) => auth_key_response(&AuthKey::from(auth_key)),
         Err(e) => failed_to_generate_key_response(e),
     }
@@ -111,7 +114,7 @@ pub async fn delete_auth_key_handler(
 ) -> Response {
     match Key::from_str(&seconds_valid_or_key.0) {
         Err(_) => invalid_auth_key_param_response(&seconds_valid_or_key.0),
-        Ok(key) => match keys_handler.remove_auth_key(&key).await {
+        Ok(key) => match keys_handler.remove_peer_key(&key).await {
             Ok(()) => ok_response(),
             Err(e) => failed_to_delete_key_response(e),
         },
@@ -131,7 +134,7 @@ pub async fn delete_auth_key_handler(
 /// Refer to the [API endpoint documentation](crate::servers::apis::v1::context::auth_key#reload-authentication-keys)
 /// for more information about this endpoint.
 pub async fn reload_keys_handler(State(keys_handler): State<Arc<KeysHandler>>) -> Response {
-    match keys_handler.load_keys_from_database().await {
+    match keys_handler.load_peer_keys_from_database().await {
         Ok(()) => ok_response(),
         Err(e) => failed_to_reload_keys_response(e),
     }
