@@ -82,8 +82,10 @@ mod tests {
             };
 
             let result = repository.add(&peer_key);
-
             assert!(result.is_ok());
+
+            let keys = repository.load_keys().unwrap();
+            assert_eq!(keys, vec!(peer_key));
         }
 
         #[test]
@@ -102,8 +104,10 @@ mod tests {
             let _unused = repository.add(&peer_key);
 
             let result = repository.remove(&peer_key.key);
-
             assert!(result.is_ok());
+
+            let keys = repository.load_keys().unwrap();
+            assert!(keys.is_empty());
         }
 
         #[test]
