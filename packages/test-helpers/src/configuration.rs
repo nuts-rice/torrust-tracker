@@ -1,6 +1,7 @@
 //! Tracker configuration factories for testing.
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use torrust_tracker_configuration::{Configuration, HttpApi, HttpTracker, Threshold, UdpTracker};
@@ -63,13 +64,17 @@ pub fn ephemeral() -> Configuration {
         tsl_config: None,
     }]);
 
-    // Ephemeral sqlite database
-    let temp_directory = env::temp_dir();
-    let random_db_id = random::string(16);
-    let temp_file = temp_directory.join(format!("data_{random_db_id}.db"));
+    let temp_file = ephemeral_sqlite_database();
     temp_file.to_str().unwrap().clone_into(&mut config.core.database.path);
 
     config
+}
+
+#[must_use]
+pub fn ephemeral_sqlite_database() -> PathBuf {
+    let temp_directory = env::temp_dir();
+    let random_db_id = random::string(16);
+    temp_directory.join(format!("data_{random_db_id}.db"))
 }
 
 /// Ephemeral configuration with reverse proxy enabled.

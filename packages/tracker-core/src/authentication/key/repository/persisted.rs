@@ -54,17 +54,25 @@ mod tests {
 
         use std::time::Duration;
 
-        use torrust_tracker_test_helpers::configuration;
+        use torrust_tracker_configuration::Core;
+        use torrust_tracker_test_helpers::configuration::ephemeral_sqlite_database;
 
         use crate::authentication::key::repository::persisted::DatabaseKeyRepository;
         use crate::authentication::{Key, PeerKey};
         use crate::databases::setup::initialize_database;
 
+        fn ephemeral_configuration() -> Core {
+            let mut config = Core::default();
+            let temp_file = ephemeral_sqlite_database();
+            temp_file.to_str().unwrap().clone_into(&mut config.database.path);
+            config
+        }
+
         #[test]
         fn persist_a_new_peer_key() {
-            let configuration = configuration::ephemeral_public();
+            let configuration = ephemeral_configuration();
 
-            let database = initialize_database(&configuration.core);
+            let database = initialize_database(&configuration);
 
             let repository = DatabaseKeyRepository::new(&database);
 
@@ -80,9 +88,9 @@ mod tests {
 
         #[test]
         fn remove_a_persisted_peer_key() {
-            let configuration = configuration::ephemeral_public();
+            let configuration = ephemeral_configuration();
 
-            let database = initialize_database(&configuration.core);
+            let database = initialize_database(&configuration);
 
             let repository = DatabaseKeyRepository::new(&database);
 
@@ -100,9 +108,9 @@ mod tests {
 
         #[test]
         fn load_all_persisted_peer_keys() {
-            let configuration = configuration::ephemeral_public();
+            let configuration = ephemeral_configuration();
 
-            let database = initialize_database(&configuration.core);
+            let database = initialize_database(&configuration);
 
             let repository = DatabaseKeyRepository::new(&database);
 
