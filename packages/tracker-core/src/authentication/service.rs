@@ -31,7 +31,7 @@ impl AuthenticationService {
     ///
     /// Will return an error if the the authentication key cannot be verified.
     pub async fn authenticate(&self, key: &Key) -> Result<(), Error> {
-        if self.is_private() {
+        if self.tracker_is_private() {
             self.verify_auth_key(key).await
         } else {
             Ok(())
@@ -40,7 +40,7 @@ impl AuthenticationService {
 
     /// Returns `true` is the tracker is in private mode.
     #[must_use]
-    pub fn is_private(&self) -> bool {
+    fn tracker_is_private(&self) -> bool {
         self.config.private
     }
 
@@ -72,34 +72,198 @@ impl AuthenticationService {
 #[cfg(test)]
 mod tests {
 
-    mod the_tracker_configured_as_private {
+    mod the_authentication_service {
 
-        use std::str::FromStr;
-        use std::sync::Arc;
+        mod when_the_tracker_is_public {
 
-        use torrust_tracker_test_helpers::configuration;
+            use std::str::FromStr;
+            use std::sync::Arc;
 
-        use crate::authentication;
-        use crate::authentication::key::repository::in_memory::InMemoryKeyRepository;
-        use crate::authentication::service::AuthenticationService;
+            use torrust_tracker_configuration::Core;
 
-        fn instantiate_authentication() -> AuthenticationService {
-            let config = configuration::ephemeral_private();
+            use crate::authentication::key::repository::in_memory::InMemoryKeyRepository;
+            use crate::authentication::service::AuthenticationService;
+            use crate::authentication::{self};
 
-            let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+            fn instantiate_authentication_for_public_tracker() -> AuthenticationService {
+                let config = Core {
+                    private: false,
+                    ..Default::default()
+                };
 
-            AuthenticationService::new(&config.core, &in_memory_key_repository.clone())
+                let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+                AuthenticationService::new(&config, &in_memory_key_repository.clone())
+            }
+
+            #[tokio::test]
+            async fn it_should_always_authenticate_when_the_tracker_is_public() {
+                let authentication = instantiate_authentication_for_public_tracker();
+
+                let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+
+                let result = authentication.authenticate(&unregistered_key).await;
+
+                assert!(result.is_ok());
+            }
         }
 
-        #[tokio::test]
-        async fn it_should_not_authenticate_an_unregistered_key() {
-            let authentication = instantiate_authentication();
+        mod when_the_tracker_is_private {
 
-            let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+            use std::str::FromStr;
+            use std::sync::Arc;
+            use std::time::Duration;
 
-            let result = authentication.authenticate(&unregistered_key).await;
+            use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
+            use torrust_tracker_configuration::Core;
 
-            assert!(result.is_err());
+            use crate::authentication::key::repository::in_memory::InMemoryKeyRepository;
+            use crate::authentication::service::AuthenticationService;
+            use crate::authentication::{self, PeerKey};
+
+            fn instantiate_authentication_for_private_tracker() -> AuthenticationService {
+                let config = Core {
+                    private: true,
+                    ..Default::default()
+                };
+
+                let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+                AuthenticationService::new(&config, &in_memory_key_repository.clone())
+            }
+
+            #[tokio::test]
+            async fn it_should_authenticate_a_registered_key() {
+                let config = Core {
+                    private: true,
+                    ..Default::default()
+                };
+
+                let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+                let key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+
+                in_memory_key_repository
+                    .insert(&PeerKey {
+                        key: key.clone(),
+                        valid_until: None,
+                    })
+                    .await;
+
+                let authentication = AuthenticationService::new(&config, &in_memory_key_repository.clone());
+
+                let result = authentication.authenticate(&key).await;
+
+                assert!(result.is_ok());
+            }
+
+            #[tokio::test]
+            async fn it_should_not_authenticate_an_unregistered_key() {
+                let authentication = instantiate_authentication_for_private_tracker();
+
+                let unregistered_key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+
+                let result = authentication.authenticate(&unregistered_key).await;
+
+                assert!(result.is_err());
+            }
+
+            #[tokio::test]
+            async fn it_should_not_authenticate_a_registered_but_expired_key_by_default() {
+                let config = Core {
+                    private: true,
+                    ..Default::default()
+                };
+
+                let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+                let key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+
+                // Register the key with an immediate expiration date.
+                in_memory_key_repository
+                    .insert(&PeerKey {
+                        key: key.clone(),
+                        valid_until: Some(Duration::from_secs(0)),
+                    })
+                    .await;
+
+                let authentication = AuthenticationService::new(&config, &in_memory_key_repository.clone());
+
+                let result = authentication.authenticate(&key).await;
+
+                assert!(result.is_err());
+            }
+
+            #[tokio::test]
+            async fn it_should_not_authenticate_a_registered_but_expired_key_when_the_tracker_is_explicitly_configured_to_check_keys_expiration() {
+                let config = Core {
+                    private: true,
+                    private_mode: Some(PrivateMode {
+                        check_keys_expiration: true,
+                    }),
+                    ..Default::default()
+                };
+
+                let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+                let key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+
+                // Register the key with an immediate expiration date.
+                in_memory_key_repository
+                    .insert(&PeerKey {
+                        key: key.clone(),
+                        valid_until: Some(Duration::from_secs(0)),
+                    })
+                    .await;
+
+                let authentication = AuthenticationService::new(&config, &in_memory_key_repository.clone());
+
+                let result = authentication.authenticate(&key).await;
+
+                assert!(result.is_err());
+            }
+
+            mod but_the_key_expiration_check_is_disabled_by_configuration {
+                use std::str::FromStr;
+                use std::sync::Arc;
+                use std::time::Duration;
+
+                use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
+                use torrust_tracker_configuration::Core;
+
+                use crate::authentication::key::repository::in_memory::InMemoryKeyRepository;
+                use crate::authentication::service::AuthenticationService;
+                use crate::authentication::{self, PeerKey};
+
+                #[tokio::test]
+                async fn it_should_authenticate_an_expired_registered_key() {
+                    let config = Core {
+                        private: true,
+                        private_mode: Some(PrivateMode {
+                            check_keys_expiration: false,
+                        }),
+                        ..Default::default()
+                    };
+
+                    let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+                    let key = authentication::Key::from_str("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+
+                    // Register the key with an immediate expiration date.
+                    in_memory_key_repository
+                        .insert(&PeerKey {
+                            key: key.clone(),
+                            valid_until: Some(Duration::from_secs(0)),
+                        })
+                        .await;
+
+                    let authentication = AuthenticationService::new(&config, &in_memory_key_repository.clone());
+
+                    let result = authentication.authenticate(&key).await;
+
+                    assert!(result.is_ok());
+                }
+            }
         }
     }
 }
