@@ -48,20 +48,6 @@ impl WhitelistManager {
         Ok(())
     }
 
-    /// It removes a torrent from the whitelist in the database.
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to remove the `info_hash` from the whitelist database.
-    pub fn remove_torrent_from_database_whitelist(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
-        self.database_whitelist.remove(info_hash)
-    }
-
-    /// It adds a torrent from the whitelist in memory.
-    pub async fn add_torrent_to_memory_whitelist(&self, info_hash: &InfoHash) -> bool {
-        self.in_memory_whitelist.add(info_hash).await
-    }
-
     /// It removes a torrent from the whitelist in memory.
     pub async fn remove_torrent_from_memory_whitelist(&self, info_hash: &InfoHash) -> bool {
         self.in_memory_whitelist.remove(info_hash).await
