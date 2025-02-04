@@ -536,7 +536,7 @@ mod tests {
 
     fn initialize_core_tracker_services(config: &Configuration) -> (CoreTrackerServices, CoreUdpTrackerServices) {
         let core_config = Arc::new(config.core.clone());
-        let database = initialize_database(config);
+        let database = initialize_database(&config.core);
         let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
         let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
         let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
@@ -1470,7 +1470,7 @@ mod tests {
                 async fn the_peer_ip_should_be_changed_to_the_external_ip_in_the_tracker_configuration() {
                     let config = Arc::new(TrackerConfigurationBuilder::default().with_external_ip("::126.0.0.1").into());
 
-                    let database = initialize_database(&config);
+                    let database = initialize_database(&config.core);
                     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
                     let whitelist_authorization =
                         Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));

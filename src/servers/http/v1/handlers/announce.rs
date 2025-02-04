@@ -294,7 +294,7 @@ mod tests {
 
     fn initialize_core_tracker_services(config: &Configuration) -> (CoreTrackerServices, CoreHttpTrackerServices) {
         let core_config = Arc::new(config.core.clone());
-        let database = initialize_database(config);
+        let database = initialize_database(&config.core);
         let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
         let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
         let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());

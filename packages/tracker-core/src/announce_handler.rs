@@ -425,7 +425,7 @@ mod tests {
 
                 config.core.tracker_policy.persistent_torrent_completed_stat = true;
 
-                let database = initialize_database(&config);
+                let database = initialize_database(&config.core);
                 let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
                 let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
                 let torrents_manager = Arc::new(TorrentsManager::new(

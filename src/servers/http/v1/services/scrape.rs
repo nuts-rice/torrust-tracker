@@ -102,7 +102,7 @@ mod tests {
     fn initialize_announce_and_scrape_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
 
-        let database = initialize_database(&config);
+        let database = initialize_database(&config.core);
         let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
         let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&config.core, &in_memory_whitelist.clone()));
         let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());

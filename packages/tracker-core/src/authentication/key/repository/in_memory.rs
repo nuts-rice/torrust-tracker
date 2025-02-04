@@ -39,3 +39,106 @@ impl InMemoryKeyRepository {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    mod the_in_memory_key_repository_should {
+        use std::time::Duration;
+
+        use crate::authentication::key::repository::in_memory::InMemoryKeyRepository;
+        use crate::authentication::key::Key;
+        use crate::authentication::PeerKey;
+
+        #[tokio::test]
+        async fn insert_a_new_peer_key() {
+            let repository = InMemoryKeyRepository::default();
+
+            let new_peer_key = PeerKey {
+                key: Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(),
+                valid_until: Some(Duration::new(9999, 0)),
+            };
+
+            repository.insert(&new_peer_key).await;
+
+            let peer_key = repository.get(&new_peer_key.key).await;
+
+            assert_eq!(peer_key, Some(new_peer_key));
+        }
+
+        #[tokio::test]
+        async fn remove_a_new_peer_key() {
+            let repository = InMemoryKeyRepository::default();
+
+            let new_peer_key = PeerKey {
+                key: Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(),
+                valid_until: Some(Duration::new(9999, 0)),
+            };
+
+            repository.insert(&new_peer_key).await;
+
+            repository.remove(&new_peer_key.key).await;
+
+            let peer_key = repository.get(&new_peer_key.key).await;
+
+            assert_eq!(peer_key, None);
+        }
+
+        #[tokio::test]
+        async fn get_a_new_peer_key_by_its_internal_key() {
+            let repository = InMemoryKeyRepository::default();
+
+            let expected_peer_key = PeerKey {
+                key: Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(),
+                valid_until: Some(Duration::new(9999, 0)),
+            };
+
+            repository.insert(&expected_peer_key).await;
+
+            let peer_key = repository.get(&expected_peer_key.key).await;
+
+            assert_eq!(peer_key, Some(expected_peer_key));
+        }
+
+        #[tokio::test]
+        async fn clear_all_peer_keys() {
+            let repository = InMemoryKeyRepository::default();
+
+            let new_peer_key = PeerKey {
+                key: Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(),
+                valid_until: Some(Duration::new(9999, 0)),
+            };
+
+            repository.insert(&new_peer_key).await;
+
+            repository.clear().await;
+
+            let peer_key = repository.get(&new_peer_key.key).await;
+
+            assert_eq!(peer_key, None);
+        }
+
+        #[tokio::test]
+        async fn reset_the_peer_keys_with_a_new_list_of_keys() {
+            let repository = InMemoryKeyRepository::default();
+
+            let old_peer_key = PeerKey {
+                key: Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(),
+                valid_until: Some(Duration::new(9999, 0)),
+            };
+
+            repository.insert(&old_peer_key).await;
+
+            let new_peer_key = PeerKey {
+                key: Key::new("kqdVKHlKKWXzAideqI5gvjBP4jdbe5dW").unwrap(),
+                valid_until: Some(Duration::new(9999, 0)),
+            };
+
+            repository.reset_with(vec![new_peer_key.clone()]).await;
+
+            let peer_key = repository.get(&new_peer_key.key).await;
+
+            assert_eq!(peer_key, Some(new_peer_key));
+        }
+    }
+}
