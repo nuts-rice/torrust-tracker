@@ -55,68 +55,73 @@ impl KeysHandler {
     /// - The provided pre-generated key is invalid.
     /// - The key could not been persisted due to database issues.
     pub async fn add_peer_key(&self, add_key_req: AddKeyRequest) -> Result<PeerKey, PeerKeyError> {
-        match add_key_req.opt_key {
-            Some(pre_existing_key) => {
-                // Upload pre-generated key
+        if let Some(pre_existing_key) = add_key_req.opt_key {
+            // Pre-generated key
 
-                if let Some(seconds_valid) = add_key_req.opt_seconds_valid {
-                    // Expiring key
-                    let Some(valid_until) = CurrentClock::now_add(&Duration::from_secs(seconds_valid)) else {
-                        return Err(PeerKeyError::DurationOverflow { seconds_valid });
-                    };
+            if let Some(seconds_valid) = add_key_req.opt_seconds_valid {
+                // Expiring key
 
-                    let key = pre_existing_key.parse::<Key>();
+                let Some(valid_until) = CurrentClock::now_add(&Duration::from_secs(seconds_valid)) else {
+                    return Err(PeerKeyError::DurationOverflow { seconds_valid });
+                };
 
-                    match key {
-                        Ok(key) => match self.add_expiring_peer_key(key, Some(valid_until)).await {
-                            Ok(auth_key) => Ok(auth_key),
-                            Err(err) => Err(PeerKeyError::DatabaseError {
-                                source: Located(err).into(),
-                            }),
-                        },
-                        Err(err) => Err(PeerKeyError::InvalidKey {
-                            key: pre_existing_key,
+                let key = pre_existing_key.parse::<Key>();
+
+                match key {
+                    Ok(key) => match self.add_expiring_peer_key(key, Some(valid_until)).await {
+                        Ok(auth_key) => Ok(auth_key),
+                        Err(err) => Err(PeerKeyError::DatabaseError {
                             source: Located(err).into(),
                         }),
-                    }
-                } else {
-                    // Permanent key
-                    let key = pre_existing_key.parse::<Key>();
+                    },
+                    Err(err) => Err(PeerKeyError::InvalidKey {
+                        key: pre_existing_key,
+                        source: Located(err).into(),
+                    }),
+                }
+            } else {
+                // Permanent key
 
-                    match key {
-                        Ok(key) => match self.add_permanent_peer_key(key).await {
-                            Ok(auth_key) => Ok(auth_key),
-                            Err(err) => Err(PeerKeyError::DatabaseError {
-                                source: Located(err).into(),
-                            }),
-                        },
-                        Err(err) => Err(PeerKeyError::InvalidKey {
-                            key: pre_existing_key,
+                let key = pre_existing_key.parse::<Key>();
+
+                match key {
+                    Ok(key) => match self.add_permanent_peer_key(key).await {
+                        Ok(auth_key) => Ok(auth_key),
+                        Err(err) => Err(PeerKeyError::DatabaseError {
                             source: Located(err).into(),
                         }),
-                    }
+                    },
+                    Err(err) => Err(PeerKeyError::InvalidKey {
+                        key: pre_existing_key,
+                        source: Located(err).into(),
+                    }),
                 }
             }
-            None => match add_key_req.opt_seconds_valid {
-                // Generate a new random key
-                Some(seconds_valid) => match self
+        } else {
+            // New randomly generate key
+
+            if let Some(seconds_valid) = add_key_req.opt_seconds_valid {
+                // Expiring key
+
+                match self
                     .generate_expiring_peer_key(Some(Duration::from_secs(seconds_valid)))
                     .await
                 {
-                    // Expiring key
                     Ok(auth_key) => Ok(auth_key),
                     Err(err) => Err(PeerKeyError::DatabaseError {
                         source: Located(err).into(),
                     }),
-                },
-                None => match self.generate_permanent_peer_key().await {
-                    // Permanent key
+                }
+            } else {
+                // Permanent key
+
+                match self.generate_permanent_peer_key().await {
                     Ok(auth_key) => Ok(auth_key),
                     Err(err) => Err(PeerKeyError::DatabaseError {
                         source: Located(err).into(),
                     }),
-                },
-            },
+                }
+            }
         }
     }
 
@@ -250,6 +255,7 @@ mod tests {
         use crate::authentication::key::repository::in_memory::InMemoryKeyRepository;
         use crate::authentication::key::repository::persisted::DatabaseKeyRepository;
         use crate::databases::setup::initialize_database;
+        use crate::databases::Database;
 
         fn instantiate_keys_handler() -> KeysHandler {
             let config = configuration::ephemeral_private();
@@ -266,6 +272,13 @@ mod tests {
             });
 
             instantiate_keys_handler_with_configuration(&config)
+        }
+
+        fn instantiate_keys_handler_with_database(database: &Arc<Box<dyn Database>>) -> KeysHandler {
+            let db_key_repository = Arc::new(DatabaseKeyRepository::new(database));
+            let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+
+            KeysHandler::new(&db_key_repository, &in_memory_key_repository)
         }
 
         fn instantiate_keys_handler_with_configuration(config: &Configuration) -> KeysHandler {
@@ -303,12 +316,22 @@ mod tests {
             }
 
             mod randomly_generated {
+                use std::panic::Location;
+                use std::sync::Arc;
                 use std::time::Duration;
 
-                use torrust_tracker_clock::clock::Time;
+                use mockall::predicate::function;
+                use torrust_tracker_clock::clock::stopped::Stopped;
+                use torrust_tracker_clock::clock::{self, Time};
 
-                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::instantiate_keys_handler;
+                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::{
+                    instantiate_keys_handler, instantiate_keys_handler_with_database,
+                };
                 use crate::authentication::handler::AddKeyRequest;
+                use crate::authentication::PeerKey;
+                use crate::databases::driver::Driver;
+                use crate::databases::{self, Database, MockDatabase};
+                use crate::error::PeerKeyError;
                 use crate::CurrentClock;
 
                 #[tokio::test]
@@ -328,21 +351,58 @@ mod tests {
                         Some(CurrentClock::now_add(&Duration::from_secs(100)).unwrap())
                     );
                 }
+
+                #[tokio::test]
+                async fn it_should_fail_adding_a_randomly_generated_key_when_there_is_a_database_error() {
+                    clock::Stopped::local_set(&Duration::from_secs(0));
+
+                    // The key should be valid the next 60 seconds.
+                    let expected_valid_until = clock::Stopped::now_add(&Duration::from_secs(60)).unwrap();
+
+                    let mut database_mock = MockDatabase::default();
+                    database_mock
+                        .expect_add_key_to_keys()
+                        .with(function(move |peer_key: &PeerKey| {
+                            peer_key.valid_until == Some(expected_valid_until)
+                        }))
+                        .times(1)
+                        .returning(|_peer_key| {
+                            Err(databases::error::Error::InsertFailed {
+                                location: Location::caller(),
+                                driver: Driver::Sqlite3,
+                            })
+                        });
+                    let database_mock: Arc<Box<dyn Database>> = Arc::new(Box::new(database_mock));
+
+                    let keys_handler = instantiate_keys_handler_with_database(&database_mock);
+
+                    let result = keys_handler
+                        .add_peer_key(AddKeyRequest {
+                            opt_key: None,
+                            opt_seconds_valid: Some(60), // The key is valid for 60 seconds.
+                        })
+                        .await;
+
+                    assert!(matches!(result.unwrap_err(), PeerKeyError::DatabaseError { .. }));
+                }
             }
 
             mod pre_generated {
+                use std::panic::Location;
                 use std::sync::Arc;
                 use std::time::Duration;
 
-                use torrust_tracker_clock::clock::Time;
-                use torrust_tracker_test_helpers::configuration;
+                use mockall::predicate;
+                use torrust_tracker_clock::clock::stopped::Stopped;
+                use torrust_tracker_clock::clock::{self, Time};
 
-                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::instantiate_keys_handler;
-                use crate::authentication::handler::{AddKeyRequest, KeysHandler};
-                use crate::authentication::key::repository::in_memory::InMemoryKeyRepository;
-                use crate::authentication::key::repository::persisted::DatabaseKeyRepository;
+                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::{
+                    instantiate_keys_handler, instantiate_keys_handler_with_database,
+                };
+                use crate::authentication::handler::AddKeyRequest;
                 use crate::authentication::{Key, PeerKey};
-                use crate::databases::setup::initialize_database;
+                use crate::databases::driver::Driver;
+                use crate::databases::{self, Database, MockDatabase};
                 use crate::error::PeerKeyError;
                 use crate::CurrentClock;
 
@@ -383,23 +443,34 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_fail_adding_a_pre_generated_key_when_there_is_a_database_error() {
-                    let config = configuration::ephemeral_private();
-                    let database = initialize_database(&config.core);
-                    let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
-                    let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+                    clock::Stopped::local_set(&Duration::from_secs(0));
 
-                    // Force database error.
-                    // todo: extract trait for DatabaseKeyRepository to be able
-                    // to mock it. Test should be faster if we don't have to
-                    // create a new database.
-                    let _unused = database.drop_database_tables();
+                    // The key should be valid the next 60 seconds.
+                    let expected_valid_until = clock::Stopped::now_add(&Duration::from_secs(60)).unwrap();
+                    let expected_peer_key = PeerKey {
+                        key: Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(),
+                        valid_until: Some(expected_valid_until),
+                    };
 
-                    let keys_handler = KeysHandler::new(&db_key_repository, &in_memory_key_repository);
+                    let mut database_mock = MockDatabase::default();
+                    database_mock
+                        .expect_add_key_to_keys()
+                        .with(predicate::eq(expected_peer_key))
+                        .times(1)
+                        .returning(|_peer_key| {
+                            Err(databases::error::Error::InsertFailed {
+                                location: Location::caller(),
+                                driver: Driver::Sqlite3,
+                            })
+                        });
+                    let database_mock: Arc<Box<dyn Database>> = Arc::new(Box::new(database_mock));
+
+                    let keys_handler = instantiate_keys_handler_with_database(&database_mock);
 
                     let result = keys_handler
                         .add_peer_key(AddKeyRequest {
                             opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
-                            opt_seconds_valid: Some(100),
+                            opt_seconds_valid: Some(60), // The key is valid for 60 seconds.
                         })
                         .await;
 
@@ -410,8 +481,21 @@ mod tests {
 
         mod handling_permanent_peer_keys {
 
-            mod randomly_generated_keys {
-                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::instantiate_keys_handler;
+            mod randomly_generated {
+
+                use std::panic::Location;
+                use std::sync::Arc;
+
+                use mockall::predicate::function;
+
+                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::{
+                    instantiate_keys_handler, instantiate_keys_handler_with_database,
+                };
+                use crate::authentication::handler::AddKeyRequest;
+                use crate::authentication::PeerKey;
+                use crate::databases::driver::Driver;
+                use crate::databases::{self, Database, MockDatabase};
+                use crate::error::PeerKeyError;
 
                 #[tokio::test]
                 async fn it_should_generate_the_key() {
@@ -421,12 +505,6 @@ mod tests {
 
                     assert_eq!(peer_key.valid_until, None);
                 }
-            }
-
-            mod randomly_generated {
-
-                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::instantiate_keys_handler;
-                use crate::authentication::handler::AddKeyRequest;
 
                 #[tokio::test]
                 async fn it_should_add_a_randomly_generated_key() {
@@ -442,20 +520,49 @@ mod tests {
 
                     assert_eq!(peer_key.valid_until, None);
                 }
+
+                #[tokio::test]
+                async fn it_should_fail_adding_a_randomly_generated_key_when_there_is_a_database_error() {
+                    let mut database_mock = MockDatabase::default();
+                    database_mock
+                        .expect_add_key_to_keys()
+                        .with(function(move |peer_key: &PeerKey| peer_key.valid_until.is_none()))
+                        .times(1)
+                        .returning(|_peer_key| {
+                            Err(databases::error::Error::InsertFailed {
+                                location: Location::caller(),
+                                driver: Driver::Sqlite3,
+                            })
+                        });
+                    let database_mock: Arc<Box<dyn Database>> = Arc::new(Box::new(database_mock));
+
+                    let keys_handler = instantiate_keys_handler_with_database(&database_mock);
+
+                    let result = keys_handler
+                        .add_peer_key(AddKeyRequest {
+                            opt_key: None,
+                            opt_seconds_valid: None,
+                        })
+                        .await;
+
+                    assert!(matches!(result.unwrap_err(), PeerKeyError::DatabaseError { .. }));
+                }
             }
 
             mod pre_generated_keys {
 
+                use std::panic::Location;
                 use std::sync::Arc;
 
-                use torrust_tracker_test_helpers::configuration;
+                use mockall::predicate;
 
-                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::instantiate_keys_handler;
-                use crate::authentication::handler::{AddKeyRequest, KeysHandler};
-                use crate::authentication::key::repository::in_memory::InMemoryKeyRepository;
-                use crate::authentication::key::repository::persisted::DatabaseKeyRepository;
+                use crate::authentication::handler::tests::the_keys_handler_when_the_tracker_is_configured_as_private::{
+                    instantiate_keys_handler, instantiate_keys_handler_with_database,
+                };
+                use crate::authentication::handler::AddKeyRequest;
                 use crate::authentication::{Key, PeerKey};
-                use crate::databases::setup::initialize_database;
+                use crate::databases::driver::Driver;
+                use crate::databases::{self, Database, MockDatabase};
                 use crate::error::PeerKeyError;
 
                 #[tokio::test]
@@ -495,22 +602,29 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_fail_adding_a_pre_generated_key_when_there_is_a_database_error() {
-                    let config = configuration::ephemeral_private();
-                    let database = initialize_database(&config.core);
-                    let db_key_repository = Arc::new(DatabaseKeyRepository::new(&database));
-                    let in_memory_key_repository = Arc::new(InMemoryKeyRepository::default());
+                    let expected_peer_key = PeerKey {
+                        key: Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap(),
+                        valid_until: None,
+                    };
 
-                    // Force database error.
-                    // todo: extract trait for DatabaseKeyRepository to be able
-                    // to mock it. Test should be faster if we don't have to
-                    // create a new database.
-                    let _unused = database.drop_database_tables();
+                    let mut database_mock = MockDatabase::default();
+                    database_mock
+                        .expect_add_key_to_keys()
+                        .with(predicate::eq(expected_peer_key))
+                        .times(1)
+                        .returning(|_peer_key| {
+                            Err(databases::error::Error::InsertFailed {
+                                location: Location::caller(),
+                                driver: Driver::Sqlite3,
+                            })
+                        });
+                    let database_mock: Arc<Box<dyn Database>> = Arc::new(Box::new(database_mock));
 
-                    let keys_handler = KeysHandler::new(&db_key_repository, &in_memory_key_repository);
+                    let keys_handler = instantiate_keys_handler_with_database(&database_mock);
 
                     let result = keys_handler
                         .add_peer_key(AddKeyRequest {
-                            opt_key: Some("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ".to_string()),
+                            opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
                             opt_seconds_valid: None,
                         })
                         .await;
