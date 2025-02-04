@@ -104,10 +104,8 @@ pub fn generate_key(lifetime: Option<Duration>) -> PeerKey {
 ///
 /// # Errors
 ///
-/// Will return:
-///
-/// - `Error::KeyExpired` if `auth_key.valid_until` is past the `current_time`.
-/// - `Error::KeyInvalid` if `auth_key.valid_until` is past the `None`.
+/// Will return a verification error [`crate::authentication::key::Error`] if
+/// it cannot verify the key.
 pub fn verify_key_expiration(auth_key: &PeerKey) -> Result<(), Error> {
     let current_time: DurationSinceUnixEpoch = CurrentClock::now();
 
@@ -126,7 +124,7 @@ pub fn verify_key_expiration(auth_key: &PeerKey) -> Result<(), Error> {
 }
 
 /// Verification error. Error returned when an [`PeerKey`] cannot be
-/// verified with the (`crate::authentication::verify_key`) function.
+/// verified with the [`crate::authentication::key::verify_key_expiration`] function.
 #[derive(Debug, Error)]
 #[allow(dead_code)]
 pub enum Error {
@@ -242,6 +240,19 @@ mod tests {
             clock::Stopped::local_add(&Duration::from_secs(10 * 365 * 24 * 60 * 60)).unwrap();
 
             assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
+        }
+    }
+
+    mod the_key_verification_error {
+        use crate::authentication::key;
+
+        #[test]
+        fn could_be_a_database_error() {
+            let err = r2d2_sqlite::rusqlite::Error::InvalidQuery;
+
+            let err: key::Error = err.into();
+
+            assert!(matches!(err, key::Error::KeyVerificationError { .. }));
         }
     }
 }
