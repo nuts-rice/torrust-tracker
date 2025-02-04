@@ -428,6 +428,20 @@ mod tests {
                 }
 
                 #[tokio::test]
+                async fn it_should_fail_adding_a_pre_generated_key_when_the_key_duration_exceeds_the_maximum_duration() {
+                    let keys_handler = instantiate_keys_handler();
+
+                    let result = keys_handler
+                        .add_peer_key(AddKeyRequest {
+                            opt_key: Some(Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap().to_string()),
+                            opt_seconds_valid: Some(u64::MAX),
+                        })
+                        .await;
+
+                    assert!(matches!(result.unwrap_err(), PeerKeyError::DurationOverflow { .. }));
+                }
+
+                #[tokio::test]
                 async fn it_should_fail_adding_a_pre_generated_key_when_the_key_is_invalid() {
                     let keys_handler = instantiate_keys_handler();
 
