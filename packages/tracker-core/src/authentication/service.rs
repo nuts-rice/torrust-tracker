@@ -195,7 +195,8 @@ mod tests {
             }
 
             #[tokio::test]
-            async fn it_should_not_authenticate_a_registered_but_expired_key_when_the_tracker_is_explicitly_configured_to_check_keys_expiration() {
+            async fn it_should_not_authenticate_a_registered_but_expired_key_when_the_tracker_is_explicitly_configured_to_check_keys_expiration(
+            ) {
                 let config = Core {
                     private: true,
                     private_mode: Some(PrivateMode {
