@@ -60,3 +60,94 @@ impl DatabaseWhitelist {
         self.database.load_whitelist()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    mod the_persisted_whitelist_repository {
+
+        use torrust_tracker_configuration::Core;
+        use torrust_tracker_test_helpers::configuration::ephemeral_sqlite_database;
+
+        use crate::core_tests::sample_info_hash;
+        use crate::databases::setup::initialize_database;
+        use crate::whitelist::repository::persisted::DatabaseWhitelist;
+
+        fn initialize_database_whitelist() -> DatabaseWhitelist {
+            let configuration = ephemeral_configuration_for_listed_tracker();
+            let database = initialize_database(&configuration);
+            DatabaseWhitelist::new(database)
+        }
+
+        fn ephemeral_configuration_for_listed_tracker() -> Core {
+            let mut config = Core {
+                listed: true,
+                ..Default::default()
+            };
+
+            let temp_file = ephemeral_sqlite_database();
+            temp_file.to_str().unwrap().clone_into(&mut config.database.path);
+
+            config
+        }
+
+        #[test]
+        fn should_add_a_new_infohash_to_the_list() {
+            let whitelist = initialize_database_whitelist();
+
+            let infohash = sample_info_hash();
+
+            let _result = whitelist.add(&infohash);
+
+            assert_eq!(whitelist.load_from_database().unwrap(), vec!(infohash));
+        }
+
+        #[test]
+        fn should_remove_a_infohash_from_the_list() {
+            let whitelist = initialize_database_whitelist();
+
+            let infohash = sample_info_hash();
+
+            let _result = whitelist.add(&infohash);
+
+            let _result = whitelist.remove(&infohash);
+
+            assert_eq!(whitelist.load_from_database().unwrap(), vec!());
+        }
+
+        #[test]
+        fn should_load_all_infohashes_from_the_database() {
+            let whitelist = initialize_database_whitelist();
+
+            let infohash = sample_info_hash();
+
+            let _result = whitelist.add(&infohash);
+
+            let result = whitelist.load_from_database().unwrap();
+
+            assert_eq!(result, vec!(infohash));
+        }
+
+        #[test]
+        fn should_not_add_the_same_infohash_to_the_list_twice() {
+            let whitelist = initialize_database_whitelist();
+
+            let infohash = sample_info_hash();
+
+            let _result = whitelist.add(&infohash);
+            let _result = whitelist.add(&infohash);
+
+            assert_eq!(whitelist.load_from_database().unwrap(), vec!(infohash));
+        }
+
+        #[test]
+        fn should_not_fail_removing_an_infohash_that_is_not_in_the_list() {
+            let whitelist = initialize_database_whitelist();
+
+            let infohash = sample_info_hash();
+
+            let result = whitelist.remove(&infohash);
+
+            assert!(result.is_ok());
+        }
+    }
+}
