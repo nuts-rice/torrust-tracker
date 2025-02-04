@@ -247,7 +247,6 @@ mod tests {
 
         use std::sync::Arc;
 
-        use torrust_tracker_configuration::v2_0_0::core::PrivateMode;
         use torrust_tracker_configuration::Configuration;
         use torrust_tracker_test_helpers::configuration;
 
@@ -259,17 +258,6 @@ mod tests {
 
         fn instantiate_keys_handler() -> KeysHandler {
             let config = configuration::ephemeral_private();
-
-            instantiate_keys_handler_with_configuration(&config)
-        }
-
-        #[allow(dead_code)]
-        fn instantiate_keys_handler_with_checking_keys_expiration_disabled() -> KeysHandler {
-            let mut config = configuration::ephemeral_private();
-
-            config.core.private_mode = Some(PrivateMode {
-                check_keys_expiration: false,
-            });
 
             instantiate_keys_handler_with_configuration(&config)
         }
