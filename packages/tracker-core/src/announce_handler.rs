@@ -82,17 +82,11 @@ impl AnnounceHandler {
     /// needed for a `announce` request response.
     #[must_use]
     fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
-        let swarm_metadata_before = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
-            Some(swarm_metadata) => swarm_metadata,
-            None => SwarmMetadata::zeroed(),
-        };
+        let swarm_metadata_before = self.in_memory_torrent_repository.get_swarm_metadata(info_hash);
 
         self.in_memory_torrent_repository.upsert_peer(info_hash, peer);
 
-        let swarm_metadata_after = match self.in_memory_torrent_repository.get_opt_swarm_metadata(info_hash) {
-            Some(swarm_metadata) => swarm_metadata,
-            None => SwarmMetadata::zeroed(),
-        };
+        let swarm_metadata_after = self.in_memory_torrent_repository.get_swarm_metadata(info_hash);
 
         if swarm_metadata_before != swarm_metadata_after {
             self.persist_stats(info_hash, &swarm_metadata_after);
