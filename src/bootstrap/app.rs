@@ -141,6 +141,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         scrape_handler,
         keys_handler,
         authentication_service,
+        in_memory_whitelist,
         whitelist_authorization,
         ban_service,
         http_stats_event_sender,

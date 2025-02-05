@@ -65,10 +65,7 @@ impl DatabaseWhitelist {
 mod tests {
     mod the_persisted_whitelist_repository {
 
-        use torrust_tracker_configuration::Core;
-        use torrust_tracker_test_helpers::configuration::ephemeral_sqlite_database;
-
-        use crate::core_tests::sample_info_hash;
+        use crate::core_tests::{ephemeral_configuration_for_listed_tracker, sample_info_hash};
         use crate::databases::setup::initialize_database;
         use crate::whitelist::repository::persisted::DatabaseWhitelist;
 
@@ -76,18 +73,6 @@ mod tests {
             let configuration = ephemeral_configuration_for_listed_tracker();
             let database = initialize_database(&configuration);
             DatabaseWhitelist::new(database)
-        }
-
-        fn ephemeral_configuration_for_listed_tracker() -> Core {
-            let mut config = Core {
-                listed: true,
-                ..Default::default()
-            };
-
-            let temp_file = ephemeral_sqlite_database();
-            temp_file.to_str().unwrap().clone_into(&mut config.database.path);
-
-            config
         }
 
         #[test]
