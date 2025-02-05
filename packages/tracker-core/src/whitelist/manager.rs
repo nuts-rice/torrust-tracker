@@ -48,11 +48,6 @@ impl WhitelistManager {
         Ok(())
     }
 
-    /// It removes a torrent from the whitelist in memory.
-    pub async fn remove_torrent_from_memory_whitelist(&self, info_hash: &InfoHash) -> bool {
-        self.in_memory_whitelist.remove(info_hash).await
-    }
-
     /// It loads the whitelist from the database.
     ///
     /// # Errors
@@ -155,7 +150,7 @@ mod tests {
 
                     whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
 
-                    whitelist_manager.remove_torrent_from_memory_whitelist(&info_hash).await;
+                    services.in_memory_whitelist.remove(&info_hash).await;
 
                     assert!(!services.in_memory_whitelist.contains(&info_hash).await);
 
