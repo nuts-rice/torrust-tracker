@@ -61,33 +61,107 @@ impl WhitelistAuthorization {
 #[cfg(test)]
 mod tests {
 
-    mod configured_as_whitelisted {
+    mod the_whitelist_authorization_for_announce_and_scrape_actions {
+        use std::sync::Arc;
 
-        mod handling_authorization {
+        use torrust_tracker_configuration::Core;
+
+        use crate::whitelist::authorization::WhitelistAuthorization;
+        use crate::whitelist::repository::in_memory::InMemoryWhitelist;
+
+        fn initialize_whitelist_authorization_with(config: &Core) -> Arc<WhitelistAuthorization> {
+            let (whitelist_authorization, _in_memory_whitelist) =
+                initialize_whitelist_authorization_and_dependencies_with(config);
+            whitelist_authorization
+        }
+
+        fn initialize_whitelist_authorization_and_dependencies_with(
+            config: &Core,
+        ) -> (Arc<WhitelistAuthorization>, Arc<InMemoryWhitelist>) {
+            let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+            let whitelist_authorization = Arc::new(WhitelistAuthorization::new(config, &in_memory_whitelist.clone()));
+
+            (whitelist_authorization, in_memory_whitelist)
+        }
+
+        mod when_the_tacker_is_configured_as_listed {
+
+            use torrust_tracker_configuration::Core;
+
             use crate::core_tests::sample_info_hash;
-            use crate::whitelist::whitelist_tests::initialize_whitelist_services_for_listed_tracker;
+            use crate::error::Error;
+            use crate::whitelist::authorization::tests::the_whitelist_authorization_for_announce_and_scrape_actions::{
+                initialize_whitelist_authorization_and_dependencies_with, initialize_whitelist_authorization_with,
+            };
+
+            fn configuration_for_listed_tracker() -> Core {
+                Core {
+                    listed: true,
+                    ..Default::default()
+                }
+            }
 
             #[tokio::test]
-            async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {
-                let (whitelist_authorization, whitelist_manager) = initialize_whitelist_services_for_listed_tracker();
+            async fn should_authorize_a_whitelisted_infohash() {
+                let (whitelist_authorization, in_memory_whitelist) =
+                    initialize_whitelist_authorization_and_dependencies_with(&configuration_for_listed_tracker());
 
                 let info_hash = sample_info_hash();
 
-                let result = whitelist_manager.add_torrent_to_whitelist(&info_hash).await;
-                assert!(result.is_ok());
+                let _unused = in_memory_whitelist.add(&info_hash).await;
 
                 let result = whitelist_authorization.authorize(&info_hash).await;
+
                 assert!(result.is_ok());
             }
 
             #[tokio::test]
-            async fn it_should_not_authorize_the_announce_and_scrape_actions_on_not_whitelisted_torrents() {
-                let (whitelist_authorization, _whitelist_manager) = initialize_whitelist_services_for_listed_tracker();
+            async fn should_not_authorize_a_non_whitelisted_infohash() {
+                let whitelist_authorization = initialize_whitelist_authorization_with(&configuration_for_listed_tracker());
+
+                let result = whitelist_authorization.authorize(&sample_info_hash()).await;
+
+                assert!(matches!(result.unwrap_err(), Error::TorrentNotWhitelisted { .. }));
+            }
+        }
+
+        mod when_the_tacker_is_not_configured_as_listed {
+
+            use torrust_tracker_configuration::Core;
+
+            use crate::core_tests::sample_info_hash;
+            use crate::whitelist::authorization::tests::the_whitelist_authorization_for_announce_and_scrape_actions::{
+                initialize_whitelist_authorization_and_dependencies_with, initialize_whitelist_authorization_with,
+            };
+
+            fn configuration_for_non_listed_tracker() -> Core {
+                Core {
+                    listed: false,
+                    ..Default::default()
+                }
+            }
+
+            #[tokio::test]
+            async fn should_authorize_a_whitelisted_infohash() {
+                let (whitelist_authorization, in_memory_whitelist) =
+                    initialize_whitelist_authorization_and_dependencies_with(&configuration_for_non_listed_tracker());
 
                 let info_hash = sample_info_hash();
 
+                let _unused = in_memory_whitelist.add(&info_hash).await;
+
                 let result = whitelist_authorization.authorize(&info_hash).await;
-                assert!(result.is_err());
+
+                assert!(result.is_ok());
+            }
+
+            #[tokio::test]
+            async fn should_also_authorize_a_non_whitelisted_infohash() {
+                let whitelist_authorization = initialize_whitelist_authorization_with(&configuration_for_non_listed_tracker());
+
+                let result = whitelist_authorization.authorize(&sample_info_hash()).await;
+
+                assert!(result.is_ok());
             }
         }
     }

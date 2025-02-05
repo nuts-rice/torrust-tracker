@@ -31,9 +31,8 @@ async fn should_allow_whitelisting_a_torrent() {
 
     assert_ok(response).await;
     assert!(
-        env.http_api_container
-            .whitelist_manager
-            .is_info_hash_whitelisted(&InfoHash::from_str(&info_hash).unwrap())
+        env.in_memory_whitelist
+            .contains(&InfoHash::from_str(&info_hash).unwrap())
             .await
     );
 
@@ -181,12 +180,7 @@ async fn should_allow_removing_a_torrent_from_the_whitelist() {
         .await;
 
     assert_ok(response).await;
-    assert!(
-        !env.http_api_container
-            .whitelist_manager
-            .is_info_hash_whitelisted(&info_hash)
-            .await
-    );
+    assert!(!env.in_memory_whitelist.contains(&info_hash).await);
 
     env.stop().await;
 }
