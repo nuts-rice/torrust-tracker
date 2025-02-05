@@ -1404,7 +1404,7 @@ mod configured_as_private {
 
             let expiring_key = env
                 .keys_handler
-                .generate_auth_key(Some(Duration::from_secs(60)))
+                .generate_expiring_peer_key(Some(Duration::from_secs(60)))
                 .await
                 .unwrap();
 
@@ -1553,7 +1553,7 @@ mod configured_as_private {
 
             let expiring_key = env
                 .keys_handler
-                .generate_auth_key(Some(Duration::from_secs(60)))
+                .generate_expiring_peer_key(Some(Duration::from_secs(60)))
                 .await
                 .unwrap();
 

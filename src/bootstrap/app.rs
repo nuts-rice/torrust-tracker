@@ -104,7 +104,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     let udp_stats_repository = Arc::new(udp_stats_repository);
 
     let ban_service = Arc::new(RwLock::new(BanService::new(MAX_CONNECTION_ID_ERRORS_PER_IP)));
-    let database = initialize_database(configuration);
+    let database = initialize_database(&configuration.core);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
     let whitelist_authorization = Arc::new(WhitelistAuthorization::new(&configuration.core, &in_memory_whitelist.clone()));
     let whitelist_manager = initialize_whitelist_manager(database.clone(), in_memory_whitelist.clone());
@@ -141,6 +141,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
         scrape_handler,
         keys_handler,
         authentication_service,
+        in_memory_whitelist,
         whitelist_authorization,
         ban_service,
         http_stats_event_sender,

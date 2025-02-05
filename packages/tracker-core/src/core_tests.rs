@@ -5,8 +5,12 @@ use std::sync::Arc;
 use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
 use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_configuration::Configuration;
+#[cfg(test)]
+use torrust_tracker_configuration::Core;
 use torrust_tracker_primitives::peer::Peer;
 use torrust_tracker_primitives::DurationSinceUnixEpoch;
+#[cfg(test)]
+use torrust_tracker_test_helpers::configuration::ephemeral_sqlite_database;
 
 use super::announce_handler::AnnounceHandler;
 use super::databases::setup::initialize_database;
@@ -84,7 +88,7 @@ pub fn incomplete_peer() -> Peer {
 
 #[must_use]
 pub fn initialize_handlers(config: &Configuration) -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
-    let database = initialize_database(config);
+    let database = initialize_database(&config.core);
     let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
     let whitelist_authorization = Arc::new(whitelist::authorization::WhitelistAuthorization::new(
         &config.core,
@@ -102,4 +106,21 @@ pub fn initialize_handlers(config: &Configuration) -> (Arc<AnnounceHandler>, Arc
     let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
 
     (announce_handler, scrape_handler)
+}
+
+/// # Panics
+///
+/// Will panic if the temporary file path is not a valid UFT string.
+#[cfg(test)]
+#[must_use]
+pub fn ephemeral_configuration_for_listed_tracker() -> Core {
+    let mut config = Core {
+        listed: true,
+        ..Default::default()
+    };
+
+    let temp_file = ephemeral_sqlite_database();
+    temp_file.to_str().unwrap().clone_into(&mut config.database.path);
+
+    config
 }

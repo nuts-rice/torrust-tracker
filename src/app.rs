@@ -55,7 +55,7 @@ pub async fn start(config: &Configuration, app_container: &Arc<AppContainer>) ->
     if config.core.private {
         app_container
             .keys_handler
-            .load_keys_from_database()
+            .load_peer_keys_from_database()
             .await
             .expect("Could not retrieve keys from database.");
     }

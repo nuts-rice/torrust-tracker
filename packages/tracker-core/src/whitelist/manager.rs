@@ -48,30 +48,6 @@ impl WhitelistManager {
         Ok(())
     }
 
-    /// It removes a torrent from the whitelist in the database.
-    ///
-    /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to remove the `info_hash` from the whitelist database.
-    pub fn remove_torrent_from_database_whitelist(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
-        self.database_whitelist.remove(info_hash)
-    }
-
-    /// It adds a torrent from the whitelist in memory.
-    pub async fn add_torrent_to_memory_whitelist(&self, info_hash: &InfoHash) -> bool {
-        self.in_memory_whitelist.add(info_hash).await
-    }
-
-    /// It removes a torrent from the whitelist in memory.
-    pub async fn remove_torrent_from_memory_whitelist(&self, info_hash: &InfoHash) -> bool {
-        self.in_memory_whitelist.remove(info_hash).await
-    }
-
-    /// It checks if a torrent is whitelisted.
-    pub async fn is_info_hash_whitelisted(&self, info_hash: &InfoHash) -> bool {
-        self.in_memory_whitelist.contains(info_hash).await
-    }
-
     /// It loads the whitelist from the database.
     ///
     /// # Errors
@@ -95,17 +71,41 @@ mod tests {
 
     use std::sync::Arc;
 
-    use torrust_tracker_test_helpers::configuration;
+    use torrust_tracker_configuration::Core;
 
+    use crate::core_tests::ephemeral_configuration_for_listed_tracker;
+    use crate::databases::setup::initialize_database;
+    use crate::databases::Database;
     use crate::whitelist::manager::WhitelistManager;
-    use crate::whitelist::whitelist_tests::initialize_whitelist_services;
+    use crate::whitelist::repository::in_memory::InMemoryWhitelist;
+    use crate::whitelist::repository::persisted::DatabaseWhitelist;
 
-    fn initialize_whitelist_manager_for_whitelisted_tracker() -> Arc<WhitelistManager> {
-        let config = configuration::ephemeral_listed();
+    struct WhitelistManagerDeps {
+        pub _database: Arc<Box<dyn Database>>,
+        pub database_whitelist: Arc<DatabaseWhitelist>,
+        pub in_memory_whitelist: Arc<InMemoryWhitelist>,
+    }
 
-        let (_whitelist_authorization, whitelist_manager) = initialize_whitelist_services(&config);
+    fn initialize_whitelist_manager_for_whitelisted_tracker() -> (Arc<WhitelistManager>, Arc<WhitelistManagerDeps>) {
+        let config = ephemeral_configuration_for_listed_tracker();
+        initialize_whitelist_manager_and_deps(&config)
+    }
 
-        whitelist_manager
+    fn initialize_whitelist_manager_and_deps(config: &Core) -> (Arc<WhitelistManager>, Arc<WhitelistManagerDeps>) {
+        let database = initialize_database(config);
+        let database_whitelist = Arc::new(DatabaseWhitelist::new(database.clone()));
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+
+        let whitelist_manager = Arc::new(WhitelistManager::new(database_whitelist.clone(), in_memory_whitelist.clone()));
+
+        (
+            whitelist_manager,
+            Arc::new(WhitelistManagerDeps {
+                _database: database,
+                database_whitelist,
+                in_memory_whitelist,
+            }),
+        )
     }
 
     mod configured_as_whitelisted {
@@ -116,18 +116,19 @@ mod tests {
 
             #[tokio::test]
             async fn it_should_add_a_torrent_to_the_whitelist() {
-                let whitelist_manager = initialize_whitelist_manager_for_whitelisted_tracker();
+                let (whitelist_manager, services) = initialize_whitelist_manager_for_whitelisted_tracker();
 
                 let info_hash = sample_info_hash();
 
                 whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
 
-                assert!(whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
+                assert!(services.in_memory_whitelist.contains(&info_hash).await);
+                assert!(services.database_whitelist.load_from_database().unwrap().contains(&info_hash));
             }
 
             #[tokio::test]
             async fn it_should_remove_a_torrent_from_the_whitelist() {
-                let whitelist_manager = initialize_whitelist_manager_for_whitelisted_tracker();
+                let (whitelist_manager, services) = initialize_whitelist_manager_for_whitelisted_tracker();
 
                 let info_hash = sample_info_hash();
 
@@ -135,7 +136,8 @@ mod tests {
 
                 whitelist_manager.remove_torrent_from_whitelist(&info_hash).await.unwrap();
 
-                assert!(!whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
+                assert!(!services.in_memory_whitelist.contains(&info_hash).await);
+                assert!(!services.database_whitelist.load_from_database().unwrap().contains(&info_hash));
             }
 
             mod persistence {
@@ -144,19 +146,15 @@ mod tests {
 
                 #[tokio::test]
                 async fn it_should_load_the_whitelist_from_the_database() {
-                    let whitelist_manager = initialize_whitelist_manager_for_whitelisted_tracker();
+                    let (whitelist_manager, services) = initialize_whitelist_manager_for_whitelisted_tracker();
 
                     let info_hash = sample_info_hash();
 
-                    whitelist_manager.add_torrent_to_whitelist(&info_hash).await.unwrap();
-
-                    whitelist_manager.remove_torrent_from_memory_whitelist(&info_hash).await;
-
-                    assert!(!whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
+                    services.database_whitelist.add(&info_hash).unwrap();
 
                     whitelist_manager.load_whitelist_from_database().await.unwrap();
 
-                    assert!(whitelist_manager.is_info_hash_whitelisted(&info_hash).await);
+                    assert!(services.in_memory_whitelist.contains(&info_hash).await);
                 }
             }
         }

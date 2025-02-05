@@ -52,6 +52,7 @@ pub mod sqlite;
 use std::marker::PhantomData;
 
 use bittorrent_primitives::info_hash::InfoHash;
+use mockall::automock;
 use torrust_tracker_primitives::PersistentTorrents;
 
 use self::error::Error;
@@ -79,6 +80,7 @@ where
 }
 
 /// The persistence trait. It contains all the methods to interact with the database.
+#[automock]
 pub trait Database: Sync + Send {
     /// It instantiates a new database driver.
     ///

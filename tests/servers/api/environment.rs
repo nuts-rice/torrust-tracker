@@ -4,6 +4,7 @@ use std::sync::Arc;
 use bittorrent_primitives::info_hash::InfoHash;
 use bittorrent_tracker_core::authentication::service::AuthenticationService;
 use bittorrent_tracker_core::databases::Database;
+use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
 use futures::executor::block_on;
 use torrust_tracker_api_client::connection_info::{ConnectionInfo, Origin};
 use torrust_tracker_configuration::Configuration;
@@ -22,6 +23,7 @@ where
 
     pub database: Arc<Box<dyn Database>>,
     pub authentication_service: Arc<AuthenticationService>,
+    pub in_memory_whitelist: Arc<InMemoryWhitelist>,
 
     pub registar: Registar,
     pub server: ApiServer<S>,
@@ -70,6 +72,7 @@ impl Environment<Stopped> {
 
             database: app_container.database.clone(),
             authentication_service: app_container.authentication_service.clone(),
+            in_memory_whitelist: app_container.in_memory_whitelist.clone(),
 
             registar: Registar::default(),
             server,
@@ -84,6 +87,7 @@ impl Environment<Stopped> {
 
             database: self.database.clone(),
             authentication_service: self.authentication_service.clone(),
+            in_memory_whitelist: self.in_memory_whitelist.clone(),
 
             registar: self.registar.clone(),
             server: self
@@ -106,6 +110,7 @@ impl Environment<Running> {
 
             database: self.database,
             authentication_service: self.authentication_service,
+            in_memory_whitelist: self.in_memory_whitelist,
 
             registar: Registar::default(),
             server: self.server.stop().await.unwrap(),

@@ -10,6 +10,7 @@ use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepo
 use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use bittorrent_tracker_core::whitelist;
 use bittorrent_tracker_core::whitelist::manager::WhitelistManager;
+use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
 use tokio::sync::RwLock;
 use torrust_tracker_configuration::{Core, HttpApi, HttpTracker, UdpTracker};
 
@@ -23,6 +24,7 @@ pub struct AppContainer {
     pub scrape_handler: Arc<ScrapeHandler>,
     pub keys_handler: Arc<KeysHandler>,
     pub authentication_service: Arc<AuthenticationService>,
+    pub in_memory_whitelist: Arc<InMemoryWhitelist>,
     pub whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
     pub ban_service: Arc<RwLock<BanService>>,
     pub http_stats_event_sender: Arc<Option<Box<dyn http_tracker_core::statistics::event::sender::Sender>>>,
