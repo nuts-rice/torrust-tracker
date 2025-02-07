@@ -297,4 +297,44 @@ mod tests {
             );
         }
     }
+
+    mod getting_basic_torrent_info_for_multiple_torrents_at_once {
+
+        use std::sync::Arc;
+
+        use crate::core_tests::sample_info_hash;
+        use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use crate::torrent::services::tests::sample_peer;
+        use crate::torrent::services::{get_torrents, BasicInfo};
+
+        #[tokio::test]
+        async fn it_should_return_an_empty_list_if_none_of_the_requested_torrents_is_found() {
+            let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+
+            let torrent_info = get_torrents(&in_memory_torrent_repository, &[sample_info_hash()]);
+
+            assert!(torrent_info.is_empty());
+        }
+
+        #[tokio::test]
+        async fn it_should_return_a_list_with_basic_info_about_the_requested_torrents() {
+            let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+
+            let info_hash = sample_info_hash();
+
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &sample_peer());
+
+            let torrent_info = get_torrents(&in_memory_torrent_repository, &[info_hash]);
+
+            assert_eq!(
+                torrent_info,
+                vec!(BasicInfo {
+                    info_hash,
+                    seeders: 1,
+                    completed: 0,
+                    leechers: 0,
+                })
+            );
+        }
+    }
 }
