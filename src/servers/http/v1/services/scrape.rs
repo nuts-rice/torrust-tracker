@@ -182,7 +182,7 @@ mod tests {
             // Announce a new peer to force scrape data to contain not zeroed data
             let mut peer = sample_peer();
             let original_peer_ip = peer.ip();
-            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
+            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::AsManyAsPossible);
 
             let scrape_data = invoke(&scrape_handler, &http_stats_event_sender, &info_hashes, &original_peer_ip).await;
 
@@ -267,7 +267,7 @@ mod tests {
             // Announce a new peer to force scrape data to contain not zeroed data
             let mut peer = sample_peer();
             let original_peer_ip = peer.ip();
-            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
+            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::AsManyAsPossible);
 
             let scrape_data = fake(&http_stats_event_sender, &info_hashes, &original_peer_ip).await;
 

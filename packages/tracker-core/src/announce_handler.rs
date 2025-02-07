@@ -111,7 +111,7 @@ impl AnnounceHandler {
 pub enum PeersWanted {
     /// The peer wants as many peers as possible in the announce response.
     #[default]
-    All,
+    AsManyAsPossible,
     /// The peer only wants a certain amount of peers in the announce response.
     Only { amount: usize },
 }
@@ -124,7 +124,7 @@ impl PeersWanted {
 
     fn limit(&self) -> usize {
         match self {
-            PeersWanted::All => TORRENT_PEERS_LIMIT,
+            PeersWanted::AsManyAsPossible => TORRENT_PEERS_LIMIT,
             PeersWanted::Only { amount } => *amount,
         }
     }
@@ -133,7 +133,7 @@ impl PeersWanted {
 impl From<i32> for PeersWanted {
     fn from(value: i32) -> Self {
         if value <= 0 {
-            return PeersWanted::All;
+            return PeersWanted::AsManyAsPossible;
         }
 
         // This conversion is safe because `value > 0`
@@ -148,7 +148,7 @@ impl From<i32> for PeersWanted {
 impl From<u32> for PeersWanted {
     fn from(value: u32) -> Self {
         if value == 0 {
-            return PeersWanted::All;
+            return PeersWanted::AsManyAsPossible;
         }
 
         let amount = value as usize;
@@ -350,7 +350,8 @@ mod tests {
 
                     let mut peer = sample_peer();
 
-                    let announce_data = announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
+                    let announce_data =
+                        announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
 
                     assert_eq!(announce_data.peers, vec![]);
                 }
@@ -364,11 +365,12 @@ mod tests {
                         &sample_info_hash(),
                         &mut previously_announced_peer,
                         &peer_ip(),
-                        &PeersWanted::All,
+                        &PeersWanted::AsManyAsPossible,
                     );
 
                     let mut peer = sample_peer_2();
-                    let announce_data = announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
+                    let announce_data =
+                        announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
 
                     assert_eq!(announce_data.peers, vec![Arc::new(previously_announced_peer)]);
                 }
@@ -382,7 +384,7 @@ mod tests {
                         &sample_info_hash(),
                         &mut previously_announced_peer_1,
                         &peer_ip(),
-                        &PeersWanted::All,
+                        &PeersWanted::AsManyAsPossible,
                     );
 
                     let mut previously_announced_peer_2 = sample_peer_2();
@@ -390,7 +392,7 @@ mod tests {
                         &sample_info_hash(),
                         &mut previously_announced_peer_2,
                         &peer_ip(),
-                        &PeersWanted::All,
+                        &PeersWanted::AsManyAsPossible,
                     );
 
                     let mut peer = sample_peer_3();
@@ -418,7 +420,7 @@ mod tests {
                         let mut peer = seeder();
 
                         let announce_data =
-                            announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
+                            announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
 
                         assert_eq!(announce_data.stats.complete, 1);
                     }
@@ -430,7 +432,7 @@ mod tests {
                         let mut peer = leecher();
 
                         let announce_data =
-                            announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::All);
+                            announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
 
                         assert_eq!(announce_data.stats.incomplete, 1);
                     }
@@ -441,11 +443,20 @@ mod tests {
 
                         // We have to announce with "started" event because peer does not count if peer was not previously known
                         let mut started_peer = started_peer();
-                        announce_handler.announce(&sample_info_hash(), &mut started_peer, &peer_ip(), &PeersWanted::All);
+                        announce_handler.announce(
+                            &sample_info_hash(),
+                            &mut started_peer,
+                            &peer_ip(),
+                            &PeersWanted::AsManyAsPossible,
+                        );
 
                         let mut completed_peer = completed_peer();
-                        let announce_data =
-                            announce_handler.announce(&sample_info_hash(), &mut completed_peer, &peer_ip(), &PeersWanted::All);
+                        let announce_data = announce_handler.announce(
+                            &sample_info_hash(),
+                            &mut completed_peer,
+                            &peer_ip(),
+                            &PeersWanted::AsManyAsPossible,
+                        );
 
                         assert_eq!(announce_data.stats.downloaded, 1);
                     }
@@ -494,11 +505,11 @@ mod tests {
                 let mut peer = sample_peer();
 
                 peer.event = AnnounceEvent::Started;
-                let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
                 assert_eq!(announce_data.stats.downloaded, 0);
 
                 peer.event = AnnounceEvent::Completed;
-                let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
                 assert_eq!(announce_data.stats.downloaded, 1);
 
                 // Remove the newly updated torrent from memory
@@ -533,7 +544,7 @@ mod tests {
 
             #[test]
             fn it_should_return_74_at_the_most_if_the_client_wants_them_all() {
-                let peers_wanted = PeersWanted::All;
+                let peers_wanted = PeersWanted::AsManyAsPossible;
 
                 assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
             }

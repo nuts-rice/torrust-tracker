@@ -460,7 +460,7 @@ mod tests {
                         &info_hash,
                         &mut complete_peer,
                         &IpAddr::V4(Ipv4Addr::new(126, 0, 0, 10)),
-                        &PeersWanted::All,
+                        &PeersWanted::AsManyAsPossible,
                     );
 
                     // Announce an "incomplete" peer for the torrent
@@ -469,7 +469,7 @@ mod tests {
                         &info_hash,
                         &mut incomplete_peer,
                         &IpAddr::V4(Ipv4Addr::new(126, 0, 0, 11)),
-                        &PeersWanted::All,
+                        &PeersWanted::AsManyAsPossible,
                     );
 
                     // Scrape
@@ -510,11 +510,11 @@ mod tests {
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // DevSkim: ignore DS173237
 
                     let mut peer = incomplete_peer();
-                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
 
                     // Announce twice to force non zeroed swarm metadata
                     let mut peer = complete_peer();
-                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
 
                     let scrape_data = scrape_handler.scrape(&vec![info_hash]).await;
 

@@ -175,7 +175,7 @@ async fn handle_announce(
     let mut peer = peer_from_request(announce_request, &peer_ip);
     let peers_wanted = match announce_request.numwant {
         Some(numwant) => PeersWanted::only(numwant),
-        None => PeersWanted::All,
+        None => PeersWanted::AsManyAsPossible,
     };
 
     let announce_data = services::announce::invoke(
