@@ -45,9 +45,7 @@
 //! > **NOTICE**: All keys must have an expiration date.
 pub mod driver;
 pub mod error;
-pub mod mysql;
 pub mod setup;
-pub mod sqlite;
 
 use std::marker::PhantomData;
 
@@ -69,8 +67,6 @@ impl<T> Builder<T>
 where
     T: Database + 'static,
 {
-    /// .
-    ///
     /// # Errors
     ///
     /// Will return `r2d2::Error` if `db_path` is not able to create a database.

@@ -9,8 +9,7 @@ use r2d2_sqlite::rusqlite::types::Null;
 use r2d2_sqlite::SqliteConnectionManager;
 use torrust_tracker_primitives::{DurationSinceUnixEpoch, PersistentTorrents};
 
-use super::driver::Driver;
-use super::{Database, Error};
+use super::{Database, Driver, Error};
 use crate::authentication::{self, Key};
 
 const DRIVER: Driver = Driver::Sqlite3;

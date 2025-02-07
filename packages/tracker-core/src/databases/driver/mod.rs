@@ -2,11 +2,11 @@
 //!
 //! See [`databases::driver::build`](crate::core::databases::driver::build)
 //! function for more information.
+use mysql::Mysql;
 use serde::{Deserialize, Serialize};
+use sqlite::Sqlite;
 
 use super::error::Error;
-use super::mysql::Mysql;
-use super::sqlite::Sqlite;
 use super::{Builder, Database};
 
 /// The database management system used by the tracker.
@@ -61,6 +61,18 @@ pub enum Driver {
 /// # Panics
 ///
 /// This function will panic if unable to create database tables.
+pub mod mysql;
+pub mod sqlite;
+
+/// It builds a new database driver.
+///
+/// # Panics
+///
+/// Will panic if unable to create database tables.
+///
+/// # Errors
+///
+/// Will return `Error` if unable to build the driver.
 pub fn build(driver: &Driver, db_path: &str) -> Result<Box<dyn Database>, Error> {
     let database = match driver {
         Driver::Sqlite3 => Builder::<Sqlite>::build(db_path),
