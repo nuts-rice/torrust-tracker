@@ -174,7 +174,21 @@ pub fn initialize_handlers(config: &Configuration) -> (Arc<AnnounceHandler>, Arc
 
 /// # Panics
 ///
-/// Will panic if the temporary file path is not a valid UFT string.
+/// Will panic if the temporary database file path is not a valid UFT string.
+#[cfg(test)]
+#[must_use]
+pub fn ephemeral_configuration() -> Core {
+    let mut config = Core::default();
+
+    let temp_file = ephemeral_sqlite_database();
+    temp_file.to_str().unwrap().clone_into(&mut config.database.path);
+
+    config
+}
+
+/// # Panics
+///
+/// Will panic if the temporary database file path is not a valid UFT string.
 #[cfg(test)]
 #[must_use]
 pub fn ephemeral_configuration_for_listed_tracker() -> Core {
