@@ -45,11 +45,7 @@
 //! > **NOTICE**: All keys must have an expiration date.
 pub mod driver;
 pub mod error;
-pub mod mysql;
 pub mod setup;
-pub mod sqlite;
-
-use std::marker::PhantomData;
 
 use bittorrent_primitives::info_hash::InfoHash;
 use mockall::automock;
@@ -58,41 +54,9 @@ use torrust_tracker_primitives::PersistentTorrents;
 use self::error::Error;
 use crate::authentication::{self, Key};
 
-struct Builder<T>
-where
-    T: Database,
-{
-    phantom: PhantomData<T>,
-}
-
-impl<T> Builder<T>
-where
-    T: Database + 'static,
-{
-    /// .
-    ///
-    /// # Errors
-    ///
-    /// Will return `r2d2::Error` if `db_path` is not able to create a database.
-    pub(self) fn build(db_path: &str) -> Result<Box<dyn Database>, Error> {
-        Ok(Box::new(T::new(db_path)?))
-    }
-}
-
 /// The persistence trait. It contains all the methods to interact with the database.
 #[automock]
 pub trait Database: Sync + Send {
-    /// It instantiates a new database driver.
-    ///
-    /// # Errors
-    ///
-    /// Will return `r2d2::Error` if `db_path` is not able to create a database.
-    fn new(db_path: &str) -> Result<Self, Error>
-    where
-        Self: std::marker::Sized;
-
-    // Schema
-
     /// It generates the database tables. SQL queries are hardcoded in the trait
     /// implementation.
     ///
