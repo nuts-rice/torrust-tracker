@@ -119,12 +119,7 @@ pub enum PeersWanted {
 impl PeersWanted {
     #[must_use]
     pub fn only(limit: u32) -> Self {
-        let amount: usize = match limit.try_into() {
-            Ok(amount) => amount,
-            Err(_) => TORRENT_PEERS_LIMIT,
-        };
-
-        Self::Only { amount }
+        limit.into()
     }
 
     fn limit(&self) -> usize {
@@ -137,13 +132,29 @@ impl PeersWanted {
 
 impl From<i32> for PeersWanted {
     fn from(value: i32) -> Self {
-        if value > 0 {
-            match value.try_into() {
-                Ok(peers_wanted) => Self::Only { amount: peers_wanted },
-                Err(_) => Self::All,
-            }
-        } else {
-            Self::All
+        if value <= 0 {
+            return PeersWanted::All;
+        }
+
+        // This conversion is safe because `value > 0`
+        let amount = usize::try_from(value).unwrap();
+
+        PeersWanted::Only {
+            amount: amount.min(TORRENT_PEERS_LIMIT),
+        }
+    }
+}
+
+impl From<u32> for PeersWanted {
+    fn from(value: u32) -> Self {
+        if value == 0 {
+            return PeersWanted::All;
+        }
+
+        let amount = value as usize;
+
+        PeersWanted::Only {
+            amount: amount.min(TORRENT_PEERS_LIMIT),
         }
     }
 }
@@ -210,6 +221,19 @@ mod tests {
             }
         }
 
+        /// Sample peer when for tests that need more than two peer
+        fn sample_peer_3() -> Peer {
+            Peer {
+                peer_id: PeerId(*b"-qB00000000000000003"),
+                peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 3)), 8082),
+                updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
+                uploaded: NumberOfBytes::new(0),
+                downloaded: NumberOfBytes::new(0),
+                left: NumberOfBytes::new(0),
+                event: AnnounceEvent::Completed,
+            }
+        }
+
         mod for_all_tracker_config_modes {
 
             mod handling_an_announce_request {
@@ -217,7 +241,7 @@ mod tests {
                 use std::sync::Arc;
 
                 use crate::announce_handler::tests::the_announce_handler::{
-                    peer_ip, public_tracker, sample_peer_1, sample_peer_2,
+                    peer_ip, public_tracker, sample_peer_1, sample_peer_2, sample_peer_3,
                 };
                 use crate::announce_handler::PeersWanted;
                 use crate::core_tests::{sample_info_hash, sample_peer};
@@ -349,6 +373,38 @@ mod tests {
                     assert_eq!(announce_data.peers, vec![Arc::new(previously_announced_peer)]);
                 }
 
+                #[tokio::test]
+                async fn it_should_allow_peers_to_get_only_a_subset_of_the_peers_in_the_swarm() {
+                    let (announce_handler, _scrape_handler) = public_tracker();
+
+                    let mut previously_announced_peer_1 = sample_peer_1();
+                    announce_handler.announce(
+                        &sample_info_hash(),
+                        &mut previously_announced_peer_1,
+                        &peer_ip(),
+                        &PeersWanted::All,
+                    );
+
+                    let mut previously_announced_peer_2 = sample_peer_2();
+                    announce_handler.announce(
+                        &sample_info_hash(),
+                        &mut previously_announced_peer_2,
+                        &peer_ip(),
+                        &PeersWanted::All,
+                    );
+
+                    let mut peer = sample_peer_3();
+                    let announce_data =
+                        announce_handler.announce(&sample_info_hash(), &mut peer, &peer_ip(), &PeersWanted::only(1));
+
+                    // It should return only one peer. There is no guarantee on
+                    // which peer will be returned.
+                    assert!(
+                        announce_data.peers == vec![Arc::new(previously_announced_peer_1)]
+                            || announce_data.peers == vec![Arc::new(previously_announced_peer_2)]
+                    );
+                }
+
                 mod it_should_update_the_swarm_stats_for_the_torrent {
 
                     use crate::announce_handler::tests::the_announce_handler::{peer_ip, public_tracker};
@@ -459,6 +515,96 @@ mod tests {
 
                 // It does not persist the peers
                 assert!(torrent_entry.peers_is_empty());
+            }
+        }
+
+        mod should_allow_the_client_peers_to_specified_the_number_of_peers_wanted {
+
+            use torrust_tracker_configuration::TORRENT_PEERS_LIMIT;
+
+            use crate::announce_handler::PeersWanted;
+
+            #[test]
+            fn it_should_return_the_maximin_number_of_peers_by_default() {
+                let peers_wanted = PeersWanted::default();
+
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+            }
+
+            #[test]
+            fn it_should_return_74_at_the_most_if_the_client_wants_them_all() {
+                let peers_wanted = PeersWanted::All;
+
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+            }
+
+            #[test]
+            fn it_should_allow_limiting_the_peer_list() {
+                let peers_wanted = PeersWanted::only(10);
+
+                assert_eq!(peers_wanted.limit(), 10);
+            }
+
+            fn maximum_as_u32() -> u32 {
+                u32::try_from(TORRENT_PEERS_LIMIT).unwrap()
+            }
+
+            fn maximum_as_i32() -> i32 {
+                i32::try_from(TORRENT_PEERS_LIMIT).unwrap()
+            }
+
+            #[test]
+            fn it_should_return_the_maximum_when_wanting_more_than_the_maximum() {
+                let peers_wanted = PeersWanted::only(maximum_as_u32() + 1);
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+            }
+
+            #[test]
+            fn it_should_return_the_maximum_when_wanting_only_zero() {
+                let peers_wanted = PeersWanted::only(0);
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+            }
+
+            #[test]
+            fn it_should_convert_the_peers_wanted_number_from_i32() {
+                // Negative. It should return the maximum
+                let peers_wanted: PeersWanted = (-1i32).into();
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+
+                // Zero. It should return the maximum
+                let peers_wanted: PeersWanted = 0i32.into();
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+
+                // Greater than the maximum. It should return the maximum
+                let peers_wanted: PeersWanted = (maximum_as_i32() + 1).into();
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+
+                // The maximum
+                let peers_wanted: PeersWanted = (maximum_as_i32()).into();
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+
+                // Smaller than the maximum
+                let peers_wanted: PeersWanted = (maximum_as_i32() - 1).into();
+                assert_eq!(i32::try_from(peers_wanted.limit()).unwrap(), maximum_as_i32() - 1);
+            }
+
+            #[test]
+            fn it_should_convert_the_peers_wanted_number_from_u32() {
+                // Zero. It should return the maximum
+                let peers_wanted: PeersWanted = 0u32.into();
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+
+                // Greater than the maximum. It should return the maximum
+                let peers_wanted: PeersWanted = (maximum_as_u32() + 1).into();
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+
+                // The maximum
+                let peers_wanted: PeersWanted = (maximum_as_u32()).into();
+                assert_eq!(peers_wanted.limit(), TORRENT_PEERS_LIMIT);
+
+                // Smaller than the maximum
+                let peers_wanted: PeersWanted = (maximum_as_u32() - 1).into();
+                assert_eq!(i32::try_from(peers_wanted.limit()).unwrap(), maximum_as_i32() - 1);
             }
         }
     }
