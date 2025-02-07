@@ -18,7 +18,7 @@ pub struct Sqlite {
     pool: Pool<SqliteConnectionManager>,
 }
 
-impl Database for Sqlite {
+impl Sqlite {
     /// It instantiates a new `SQLite3` database driver.
     ///
     /// Refer to [`databases::Database::new`](crate::core::databases::Database::new).
@@ -26,11 +26,15 @@ impl Database for Sqlite {
     /// # Errors
     ///
     /// Will return `r2d2::Error` if `db_path` is not able to create `SqLite` database.
-    fn new(db_path: &str) -> Result<Sqlite, Error> {
-        let cm = SqliteConnectionManager::file(db_path);
-        Pool::new(cm).map_or_else(|err| Err((err, Driver::Sqlite3).into()), |pool| Ok(Sqlite { pool }))
-    }
+    pub fn new(db_path: &str) -> Result<Self, Error> {
+        let manager = SqliteConnectionManager::file(db_path);
+        let pool = r2d2::Pool::builder().build(manager).map_err(|e| (e, DRIVER))?;
 
+        Ok(Self { pool })
+    }
+}
+
+impl Database for Sqlite {
     /// Refer to [`databases::Database::create_database_tables`](crate::core::databases::Database::create_database_tables).
     fn create_database_tables(&self) -> Result<(), Error> {
         let create_whitelist_table = "

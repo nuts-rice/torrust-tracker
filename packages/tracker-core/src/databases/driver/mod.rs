@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlite::Sqlite;
 
 use super::error::Error;
-use super::{Builder, Database};
+use super::Database;
 
 /// The database management system used by the tracker.
 ///
@@ -74,10 +74,10 @@ pub mod sqlite;
 ///
 /// Will return `Error` if unable to build the driver.
 pub fn build(driver: &Driver, db_path: &str) -> Result<Box<dyn Database>, Error> {
-    let database = match driver {
-        Driver::Sqlite3 => Builder::<Sqlite>::build(db_path),
-        Driver::MySQL => Builder::<Mysql>::build(db_path),
-    }?;
+    let database: Box<dyn Database> = match driver {
+        Driver::Sqlite3 => Box::new(Sqlite::new(db_path)?),
+        Driver::MySQL => Box::new(Mysql::new(db_path)?),
+    };
 
     database.create_database_tables().expect("Could not create database tables.");
 

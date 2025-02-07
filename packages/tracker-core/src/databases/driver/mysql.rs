@@ -19,7 +19,7 @@ pub struct Mysql {
     pool: Pool<MySqlConnectionManager>,
 }
 
-impl Database for Mysql {
+impl Mysql {
     /// It instantiates a new `MySQL` database driver.
     ///
     /// Refer to [`databases::Database::new`](crate::core::databases::Database::new).
@@ -27,7 +27,7 @@ impl Database for Mysql {
     /// # Errors
     ///
     /// Will return `r2d2::Error` if `db_path` is not able to create `MySQL` database.
-    fn new(db_path: &str) -> Result<Self, Error> {
+    pub fn new(db_path: &str) -> Result<Self, Error> {
         let opts = Opts::from_url(db_path)?;
         let builder = OptsBuilder::from_opts(opts);
         let manager = MySqlConnectionManager::new(builder);
@@ -35,7 +35,9 @@ impl Database for Mysql {
 
         Ok(Self { pool })
     }
+}
 
+impl Database for Mysql {
     /// Refer to [`databases::Database::create_database_tables`](crate::core::databases::Database::create_database_tables).
     fn create_database_tables(&self) -> Result<(), Error> {
         let create_whitelist_table = "
