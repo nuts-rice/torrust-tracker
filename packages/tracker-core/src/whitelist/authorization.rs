@@ -6,7 +6,7 @@ use torrust_tracker_configuration::Core;
 use tracing::instrument;
 
 use super::repository::in_memory::InMemoryWhitelist;
-use crate::error::Error;
+use crate::error::WhitelistError;
 
 pub struct WhitelistAuthorization {
     /// Core tracker configuration.
@@ -32,7 +32,7 @@ impl WhitelistAuthorization {
     /// Will return an error if the tracker is running in `listed` mode
     /// and the infohash is not whitelisted.
     #[instrument(skip(self, info_hash), err)]
-    pub async fn authorize(&self, info_hash: &InfoHash) -> Result<(), Error> {
+    pub async fn authorize(&self, info_hash: &InfoHash) -> Result<(), WhitelistError> {
         if !self.is_listed() {
             return Ok(());
         }
@@ -41,7 +41,7 @@ impl WhitelistAuthorization {
             return Ok(());
         }
 
-        Err(Error::TorrentNotWhitelisted {
+        Err(WhitelistError::TorrentNotWhitelisted {
             info_hash: *info_hash,
             location: Location::caller(),
         })
@@ -89,7 +89,7 @@ mod tests {
             use torrust_tracker_configuration::Core;
 
             use crate::core_tests::sample_info_hash;
-            use crate::error::Error;
+            use crate::error::WhitelistError;
             use crate::whitelist::authorization::tests::the_whitelist_authorization_for_announce_and_scrape_actions::{
                 initialize_whitelist_authorization_and_dependencies_with, initialize_whitelist_authorization_with,
             };
@@ -121,7 +121,7 @@ mod tests {
 
                 let result = whitelist_authorization.authorize(&sample_info_hash()).await;
 
-                assert!(matches!(result.unwrap_err(), Error::TorrentNotWhitelisted { .. }));
+                assert!(matches!(result.unwrap_err(), WhitelistError::TorrentNotWhitelisted { .. }));
             }
         }
 

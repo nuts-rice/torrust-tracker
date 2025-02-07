@@ -542,6 +542,7 @@ version = "3.0.0-develop"
 dependencies = [
  "aquatic_udp_protocol",
  "bittorrent-primitives",
+ "bittorrent-tracker-core",
  "derive_more",
  "multimap",
  "percent-encoding",
@@ -596,7 +597,6 @@ name = "bittorrent-tracker-core"
 version = "3.0.0-develop"
 dependencies = [
  "aquatic_udp_protocol",
- "bittorrent-http-protocol",
  "bittorrent-primitives",
  "chrono",
  "derive_more",
