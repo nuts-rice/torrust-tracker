@@ -1,11 +1,4 @@
-//! Error returned by the core `Tracker`.
-//!
-//! Error | Context | Description
-//! ---|---|---
-//! `PeerKeyNotValid` | Authentication | The supplied key is not valid. It may not be registered or expired.
-//! `PeerNotAuthenticated` | Authentication | The peer did not provide the authentication key.
-//! `TorrentNotWhitelisted` | Authorization | The action cannot be perform on a not-whitelisted torrent (it only applies for trackers running in `listed` or `private_listed` modes).
-//!
+//! Errors returned by the core tracker.
 use std::panic::Location;
 
 use bittorrent_primitives::info_hash::InfoHash;
@@ -14,20 +7,9 @@ use torrust_tracker_located_error::LocatedError;
 use super::authentication::key::ParseKeyError;
 use super::databases;
 
-/// Authentication or authorization error returned by the core `Tracker`
+/// Authorization errors returned by the core tracker.
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
-    // Authentication errors
-    #[error("The supplied key: {key:?}, is not valid: {source}")]
-    PeerKeyNotValid {
-        key: super::authentication::Key,
-        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
-    },
-
-    #[error("The peer is not authenticated, {location}")]
-    PeerNotAuthenticated { location: &'static Location<'static> },
-
-    // Authorization errors
     #[error("The torrent: {info_hash}, is not whitelisted, {location}")]
     TorrentNotWhitelisted {
         info_hash: InfoHash,
@@ -35,7 +17,7 @@ pub enum Error {
     },
 }
 
-/// Errors related to peers keys.
+/// Peers keys errors returned by the core tracker.
 #[allow(clippy::module_name_repetitions)]
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum PeerKeyError {
