@@ -7,9 +7,9 @@ use torrust_tracker_located_error::LocatedError;
 use super::authentication::key::ParseKeyError;
 use super::databases;
 
-/// Authorization errors returned by the core tracker.
+/// Whitelist errors returned by the core tracker.
 #[derive(thiserror::Error, Debug, Clone)]
-pub enum Error {
+pub enum WhitelistError {
     #[error("The torrent: {info_hash}, is not whitelisted, {location}")]
     TorrentNotWhitelisted {
         info_hash: InfoHash,
