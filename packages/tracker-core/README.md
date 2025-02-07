@@ -10,6 +10,22 @@ You usually don’t need to use this library directly. Instead, you should use t
 
 [Crate documentation](https://docs.rs/bittorrent-tracker-core).
 
+## Testing
+
+Show coverage report:
+
+```console
+cargo +stable llvm-cov
+```
+
+Export coverage report to `lcov` format:
+
+```console
+cargo +stable llvm-cov --lcov --output-path=./.coverage/lcov.info
+```
+
+If you use Visual Studio Code, you can use the [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=semasquare.vscode-coverage-gutters) extension to view the coverage lines.
+
 ## License
 
 The project is licensed under the terms of the [GNU AFFERO GENERAL PUBLIC LICENSE](./LICENSE).
