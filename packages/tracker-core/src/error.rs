@@ -8,7 +8,6 @@
 //!
 use std::panic::Location;
 
-use bittorrent_http_protocol::v1::responses;
 use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_located_error::LocatedError;
 
@@ -53,12 +52,4 @@ pub enum PeerKeyError {
     DatabaseError {
         source: LocatedError<'static, databases::error::Error>,
     },
-}
-
-impl From<Error> for responses::error::Error {
-    fn from(err: Error) -> Self {
-        responses::error::Error {
-            failure_reason: format!("Tracker error: {err}"),
-        }
-    }
 }
