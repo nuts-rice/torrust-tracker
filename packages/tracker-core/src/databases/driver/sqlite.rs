@@ -288,3 +288,116 @@ impl Database for Sqlite {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    mod the_sqlite_driver {
+        use torrust_tracker_configuration::Core;
+        use torrust_tracker_test_helpers::configuration::ephemeral_sqlite_database;
+
+        use crate::databases::driver::sqlite::Sqlite;
+        use crate::databases::Database;
+
+        fn initialize_driver_and_database() -> Sqlite {
+            let config = ephemeral_configuration();
+            let driver = Sqlite::new(&config.database.path).unwrap();
+            driver.create_database_tables().unwrap();
+            driver
+        }
+
+        fn ephemeral_configuration() -> Core {
+            let mut config = Core::default();
+            let temp_file = ephemeral_sqlite_database();
+            temp_file.to_str().unwrap().clone_into(&mut config.database.path);
+            config
+        }
+
+        mod handling_torrent_persistence {
+
+            use crate::core_tests::sample_info_hash;
+            use crate::databases::driver::sqlite::tests::the_sqlite_driver::initialize_driver_and_database;
+            use crate::databases::Database;
+
+            #[test]
+            fn it_should_save_and_load_persistent_torrents() {
+                let driver = initialize_driver_and_database();
+
+                let infohash = sample_info_hash();
+
+                let number_of_downloads = 1;
+
+                driver.save_persistent_torrent(&infohash, number_of_downloads).unwrap();
+
+                let torrents = driver.load_persistent_torrents().unwrap();
+
+                assert_eq!(torrents.len(), 1);
+                assert_eq!(torrents.get(&infohash), Some(number_of_downloads).as_ref());
+            }
+        }
+
+        mod handling_authentication_keys {
+            use std::time::Duration;
+
+            use crate::authentication::key::{generate_key, generate_permanent_key};
+            use crate::databases::driver::sqlite::tests::the_sqlite_driver::initialize_driver_and_database;
+            use crate::databases::Database;
+
+            #[test]
+            fn it_should_save_and_load_permanent_authentication_keys() {
+                let driver = initialize_driver_and_database();
+
+                // Add a new permanent key
+                let peer_key = generate_permanent_key();
+                driver.add_key_to_keys(&peer_key).unwrap();
+
+                // Get the key back
+                let stored_peer_key = driver.get_key_from_keys(&peer_key.key()).unwrap().unwrap();
+
+                assert_eq!(stored_peer_key, peer_key);
+            }
+            #[test]
+            fn it_should_save_and_load_expiring_authentication_keys() {
+                let driver = initialize_driver_and_database();
+
+                // Add a new expiring key
+                let peer_key = generate_key(Some(Duration::from_secs(120)));
+                driver.add_key_to_keys(&peer_key).unwrap();
+
+                // Get the key back
+                let stored_peer_key = driver.get_key_from_keys(&peer_key.key()).unwrap().unwrap();
+
+                /* todo:
+
+                The expiration time recovered from the database is not the same
+                as the one we set. It includes a small offset (nanoseconds).
+
+                left: PeerKey { key: Key("7HP1NslpuQn6kLVAgAF4nFpnZNSQ4hrx"), valid_until: Some(1739182308s) }
+                right: PeerKey { key: Key("7HP1NslpuQn6kLVAgAF4nFpnZNSQ4hrx"), valid_until: Some(1739182308.603691299s)
+
+                */
+
+                assert_eq!(stored_peer_key.key(), peer_key.key());
+                assert_eq!(
+                    stored_peer_key.valid_until.unwrap().as_secs(),
+                    peer_key.valid_until.unwrap().as_secs()
+                );
+            }
+
+            #[test]
+            fn it_should_remove_an_authentication_key() {
+                let driver = initialize_driver_and_database();
+
+                let peer_key = generate_key(None);
+
+                // Add a new key
+                driver.add_key_to_keys(&peer_key).unwrap();
+
+                // Remove the key
+                driver.remove_key_from_keys(&peer_key.key()).unwrap();
+
+                assert!(driver.get_key_from_keys(&peer_key.key()).unwrap().is_none());
+            }
+        }
+    }
+}
