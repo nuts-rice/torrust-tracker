@@ -195,7 +195,7 @@ mod tests {
                 core_http_tracker_services.http_stats_event_sender.clone(),
                 sample_info_hash(),
                 &mut peer,
-                &PeersWanted::All,
+                &PeersWanted::AsManyAsPossible,
             )
             .await;
 
@@ -232,7 +232,7 @@ mod tests {
                 http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
-                &PeersWanted::All,
+                &PeersWanted::AsManyAsPossible,
             )
             .await;
         }
@@ -277,7 +277,7 @@ mod tests {
                 http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
-                &PeersWanted::All,
+                &PeersWanted::AsManyAsPossible,
             )
             .await;
         }
@@ -303,7 +303,7 @@ mod tests {
                 http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
-                &PeersWanted::All,
+                &PeersWanted::AsManyAsPossible,
             )
             .await;
         }
