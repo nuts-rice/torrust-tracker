@@ -180,21 +180,8 @@ mod tests {
             // Get the key back
             let stored_peer_key = driver.get_key_from_keys(&peer_key.key()).unwrap().unwrap();
 
-            /* todo:
-
-            The expiration time recovered from the database is not the same
-            as the one we set. It includes a small offset (nanoseconds).
-
-            left: PeerKey { key: Key("7HP1NslpuQn6kLVAgAF4nFpnZNSQ4hrx"), valid_until: Some(1739182308s) }
-            right: PeerKey { key: Key("7HP1NslpuQn6kLVAgAF4nFpnZNSQ4hrx"), valid_until: Some(1739182308.603691299s)
-
-            */
-
-            assert_eq!(stored_peer_key.key(), peer_key.key());
-            assert_eq!(
-                stored_peer_key.valid_until.unwrap().as_secs(),
-                peer_key.valid_until.unwrap().as_secs()
-            );
+            assert_eq!(stored_peer_key, peer_key);
+            assert_eq!(stored_peer_key.expiry_time(), peer_key.expiry_time());
         }
 
         pub fn it_should_remove_a_permanent_authentication_key(driver: &Arc<Box<dyn Database>>) {
