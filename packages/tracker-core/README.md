@@ -23,13 +23,13 @@ TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo test
 Show coverage report:
 
 ```console
-cargo +stable llvm-cov
+TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo +stable llvm-cov
 ```
 
 Export coverage report to `lcov` format:
 
 ```console
-cargo +stable llvm-cov --lcov --output-path=./.coverage/lcov.info
+TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo +stable llvm-cov --lcov --output-path=./.coverage/lcov.info
 ```
 
 If you use Visual Studio Code, you can use the [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=semasquare.vscode-coverage-gutters) extension to view the coverage lines.

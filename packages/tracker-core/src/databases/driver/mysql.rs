@@ -247,7 +247,7 @@ impl Database for Mysql {
     fn remove_key_from_keys(&self, key: &Key) -> Result<usize, Error> {
         let mut conn = self.pool.get().map_err(|e| (e, DRIVER))?;
 
-        conn.exec_drop("DELETE FROM `keys` WHERE key = :key", params! { "key" => key.to_string() })?;
+        conn.exec_drop("DELETE FROM `keys` WHERE `key` = :key", params! { "key" => key.to_string() })?;
 
         Ok(1)
     }

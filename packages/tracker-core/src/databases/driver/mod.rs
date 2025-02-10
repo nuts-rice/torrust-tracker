@@ -101,15 +101,23 @@ mod tests {
         // todo: truncate tables otherwise they will increase in size over time.
         // That's not a problem on CI when the database is always newly created.
 
+        // Persistent torrents (stats)
+
         handling_torrent_persistence::it_should_save_and_load_persistent_torrents(driver);
+
+        // Authentication keys (for private trackers)
 
         // Permanent keys
         handling_authentication_keys::it_should_save_and_load_permanent_authentication_keys(driver);
-        //handling_authentication_keys::it_should_remove_a_permanent_authentication_key(&driver);
+        handling_authentication_keys::it_should_remove_a_permanent_authentication_key(driver);
 
         // Expiring keys
         handling_authentication_keys::it_should_save_and_load_expiring_authentication_keys(driver);
-        //handling_authentication_keys::it_should_remove_an_expiring_authentication_key(&driver);
+        handling_authentication_keys::it_should_remove_an_expiring_authentication_key(driver);
+
+        // Whitelist (for listed trackers)
+
+        // todo
 
         driver.drop_database_tables().unwrap();
     }
@@ -189,7 +197,7 @@ mod tests {
             );
         }
 
-        /*pub fn it_should_remove_a_permanent_authentication_key(driver: &Arc<Box<dyn Database>>) {
+        pub fn it_should_remove_a_permanent_authentication_key(driver: &Arc<Box<dyn Database>>) {
             let peer_key = generate_permanent_key();
 
             // Add a new key
@@ -199,9 +207,9 @@ mod tests {
             driver.remove_key_from_keys(&peer_key.key()).unwrap();
 
             assert!(driver.get_key_from_keys(&peer_key.key()).unwrap().is_none());
-        }*/
+        }
 
-        /*pub fn it_should_remove_an_expiring_authentication_key(driver: &Arc<Box<dyn Database>>) {
+        pub fn it_should_remove_an_expiring_authentication_key(driver: &Arc<Box<dyn Database>>) {
             let peer_key = generate_key(Some(Duration::from_secs(120)));
 
             // Add a new key
@@ -211,6 +219,6 @@ mod tests {
             driver.remove_key_from_keys(&peer_key.key()).unwrap();
 
             assert!(driver.get_key_from_keys(&peer_key.key()).unwrap().is_none());
-        }*/
+        }
     }
 }
