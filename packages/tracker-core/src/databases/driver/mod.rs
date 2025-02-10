@@ -95,6 +95,7 @@ mod tests {
         // Since the interface is very simple and there are no conflicts between
         // tests, we share the same database. If we want to isolate the tests in
         // the future, we can create a new database for each test.
+
         create_database_tables(driver).await.unwrap();
 
         // todo: truncate tables otherwise they will increase in size over time.
@@ -103,7 +104,7 @@ mod tests {
         handling_torrent_persistence::it_should_save_and_load_persistent_torrents(driver);
 
         // Permanent keys
-        //handling_authentication_keys::it_should_save_and_load_permanent_authentication_keys(&driver);
+        handling_authentication_keys::it_should_save_and_load_permanent_authentication_keys(driver);
         //handling_authentication_keys::it_should_remove_a_permanent_authentication_key(&driver);
 
         // Expiring keys
@@ -149,10 +150,10 @@ mod tests {
         use std::sync::Arc;
         use std::time::Duration;
 
-        use crate::authentication::key::generate_key;
+        use crate::authentication::key::{generate_key, generate_permanent_key};
         use crate::databases::Database;
 
-        /*pub fn it_should_save_and_load_permanent_authentication_keys(driver: &Arc<Box<dyn Database>>) {
+        pub fn it_should_save_and_load_permanent_authentication_keys(driver: &Arc<Box<dyn Database>>) {
             // Add a new permanent key
             let peer_key = generate_permanent_key();
             driver.add_key_to_keys(&peer_key).unwrap();
@@ -161,7 +162,7 @@ mod tests {
             let stored_peer_key = driver.get_key_from_keys(&peer_key.key()).unwrap().unwrap();
 
             assert_eq!(stored_peer_key, peer_key);
-        }*/
+        }
 
         pub fn it_should_save_and_load_expiring_authentication_keys(driver: &Arc<Box<dyn Database>>) {
             // Add a new expiring key

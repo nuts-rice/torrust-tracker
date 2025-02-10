@@ -229,16 +229,16 @@ impl Database for Mysql {
     fn add_key_to_keys(&self, auth_key: &authentication::PeerKey) -> Result<usize, Error> {
         let mut conn = self.pool.get().map_err(|e| (e, DRIVER))?;
 
-        let key = auth_key.key.to_string();
-        let valid_until = match auth_key.valid_until {
-            Some(valid_until) => valid_until.as_secs().to_string(),
-            None => todo!(),
-        };
-
-        conn.exec_drop(
-            "INSERT INTO `keys` (`key`, valid_until) VALUES (:key, :valid_until)",
-            params! { key, valid_until },
-        )?;
+        match auth_key.valid_until {
+            Some(valid_until) => conn.exec_drop(
+                "INSERT INTO `keys` (`key`, valid_until) VALUES (:key, :valid_until)",
+                params! { "key" => auth_key.key.to_string(), "valid_until" => valid_until.as_secs().to_string() },
+            )?,
+            None => conn.exec_drop(
+                "INSERT INTO `keys` (`key`) VALUES (:key)",
+                params! { "key" => auth_key.key.to_string() },
+            )?,
+        }
 
         Ok(1)
     }
