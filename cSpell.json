@@ -155,6 +155,7 @@
         "taiki",
         "tdyne",
         "tempfile",
+        "testcontainers",
         "thiserror",
         "tlsv",
         "Torrentstorm",
