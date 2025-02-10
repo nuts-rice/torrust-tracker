@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
 use bittorrent_primitives::info_hash::InfoHash;
+use rand::Rng;
 use torrust_tracker_configuration::Configuration;
 #[cfg(test)]
 use torrust_tracker_configuration::Core;
@@ -19,6 +20,16 @@ use super::torrent::repository::in_memory::InMemoryTorrentRepository;
 use super::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 use super::whitelist::repository::in_memory::InMemoryWhitelist;
 use super::whitelist::{self};
+
+/// Generates a random `InfoHash`.
+#[must_use]
+pub fn random_info_hash() -> InfoHash {
+    let mut rng = rand::rng();
+    let mut random_bytes = [0u8; 20];
+    rng.fill(&mut random_bytes);
+
+    InfoHash::from_bytes(&random_bytes)
+}
 
 /// # Panics
 ///
