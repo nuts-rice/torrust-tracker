@@ -12,6 +12,14 @@ You usually don’t need to use this library directly. Instead, you should use t
 
 ## Testing
 
+Run tests including tests for MySQL driver:
+
+```console
+TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo test
+```
+
+> NOTE: MySQL driver requires docker to run. We don't run them by default because we don't want to run them when we build container images. The Torrust Tracker container build runs unit tests for all dependencies, including this library.
+
 Show coverage report:
 
 ```console

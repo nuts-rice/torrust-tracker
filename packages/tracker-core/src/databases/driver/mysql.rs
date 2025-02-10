@@ -255,8 +255,14 @@ impl Database for Mysql {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     /*
     We run a MySQL container and run all the tests against the same container and database.
+
+    Test for this driver are executed with:
+
+    `TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo test`
 
     The `Database`` trait is very simple and we only have one driver that needs
     a container. In the future we might want to use different approaches like:
@@ -267,13 +273,12 @@ mod tests {
 
     If we increase the number of methods or the number or drivers.
     */
-    use std::time::Duration;
-
     use testcontainers::runners::AsyncRunner;
     use testcontainers::{ContainerAsync, GenericImage};
     use torrust_tracker_configuration::Core;
 
     use super::Mysql;
+    use crate::databases::driver::tests::run_tests;
     use crate::databases::Database;
 
     #[derive(Debug, Default)]
@@ -351,22 +356,13 @@ mod tests {
         config
     }
 
-    fn initialize_driver(config: &Core) -> Mysql {
-        Mysql::new(&config.database.path).unwrap()
-    }
-
-    async fn create_database_tables(driver: &Mysql) -> Result<(), Box<dyn std::error::Error>> {
-        for _ in 0..5 {
-            if driver.create_database_tables().is_ok() {
-                return Ok(());
-            }
-            tokio::time::sleep(Duration::from_secs(2)).await;
-        }
-        Err("MySQL is not ready after retries.".into())
+    fn initialize_driver(config: &Core) -> Arc<Box<dyn Database>> {
+        let driver: Arc<Box<dyn Database>> = Arc::new(Box::new(Mysql::new(&config.database.path).unwrap()));
+        driver
     }
 
     #[tokio::test]
-    async fn run() -> Result<(), Box<dyn std::error::Error + 'static>> {
+    async fn run_mysql_driver_tests() -> Result<(), Box<dyn std::error::Error + 'static>> {
         if std::env::var("TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST").is_err() {
             println!("Skipping the MySQL driver tests.");
             return Ok(());
@@ -385,115 +381,10 @@ mod tests {
 
         let driver = initialize_driver(&config);
 
-        // Since the interface is very simple and there are no conflicts between
-        // tests, we share the same database. If we want to isolate the tests in
-        // the future, we can create a new database for each test.
-        create_database_tables(&driver).await?;
-
-        // todo: truncate tables otherwise they will increase in size over time.
-        // That's not a problem on CI when the database is always newly created.
-
-        handling_torrent_persistence::it_should_save_and_load_persistent_torrents(&driver);
-
-        // Permanent keys
-        //handling_authentication_keys::it_should_save_and_load_permanent_authentication_keys(&driver);
-        //handling_authentication_keys::it_should_remove_a_permanent_authentication_key(&driver);
-
-        // Expiring keys
-        handling_authentication_keys::it_should_save_and_load_expiring_authentication_keys(&driver);
-        //handling_authentication_keys::it_should_remove_an_expiring_authentication_key(&driver);
-
-        driver.drop_database_tables().unwrap();
+        run_tests(&driver).await;
 
         mysql_container.stop().await;
 
         Ok(())
-    }
-
-    mod handling_torrent_persistence {
-
-        use crate::core_tests::sample_info_hash;
-        use crate::databases::Database;
-
-        pub fn it_should_save_and_load_persistent_torrents(driver: &impl Database) {
-            let infohash = sample_info_hash();
-
-            let number_of_downloads = 1;
-
-            driver.save_persistent_torrent(&infohash, number_of_downloads).unwrap();
-
-            let torrents = driver.load_persistent_torrents().unwrap();
-
-            assert_eq!(torrents.len(), 1);
-            assert_eq!(torrents.get(&infohash), Some(number_of_downloads).as_ref());
-        }
-    }
-
-    mod handling_authentication_keys {
-
-        use std::time::Duration;
-
-        use crate::authentication::key::generate_key;
-        use crate::databases::Database;
-
-        /*pub fn it_should_save_and_load_permanent_authentication_keys(driver: &impl Database) {
-            // Add a new permanent key
-            let peer_key = generate_permanent_key();
-            driver.add_key_to_keys(&peer_key).unwrap();
-
-            // Get the key back
-            let stored_peer_key = driver.get_key_from_keys(&peer_key.key()).unwrap().unwrap();
-
-            assert_eq!(stored_peer_key, peer_key);
-        }*/
-
-        pub fn it_should_save_and_load_expiring_authentication_keys(driver: &impl Database) {
-            // Add a new expiring key
-            let peer_key = generate_key(Some(Duration::from_secs(120)));
-            driver.add_key_to_keys(&peer_key).unwrap();
-
-            // Get the key back
-            let stored_peer_key = driver.get_key_from_keys(&peer_key.key()).unwrap().unwrap();
-
-            /* todo:
-
-            The expiration time recovered from the database is not the same
-            as the one we set. It includes a small offset (nanoseconds).
-
-            left: PeerKey { key: Key("7HP1NslpuQn6kLVAgAF4nFpnZNSQ4hrx"), valid_until: Some(1739182308s) }
-            right: PeerKey { key: Key("7HP1NslpuQn6kLVAgAF4nFpnZNSQ4hrx"), valid_until: Some(1739182308.603691299s)
-
-            */
-
-            assert_eq!(stored_peer_key.key(), peer_key.key());
-            assert_eq!(
-                stored_peer_key.valid_until.unwrap().as_secs(),
-                peer_key.valid_until.unwrap().as_secs()
-            );
-        }
-
-        /*pub fn it_should_remove_a_permanent_authentication_key(driver: &impl Database) {
-            let peer_key = generate_permanent_key();
-
-            // Add a new key
-            driver.add_key_to_keys(&peer_key).unwrap();
-
-            // Remove the key
-            driver.remove_key_from_keys(&peer_key.key()).unwrap();
-
-            assert!(driver.get_key_from_keys(&peer_key.key()).unwrap().is_none());
-        }*/
-
-        /*pub fn it_should_remove_an_expiring_authentication_key(driver: &impl Database) {
-            let peer_key = generate_key(Some(Duration::from_secs(120)));
-
-            // Add a new key
-            driver.add_key_to_keys(&peer_key).unwrap();
-
-            // Remove the key
-            driver.remove_key_from_keys(&peer_key.key()).unwrap();
-
-            assert!(driver.get_key_from_keys(&peer_key.key()).unwrap().is_none());
-        }*/
     }
 }
