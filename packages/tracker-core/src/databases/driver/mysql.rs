@@ -264,7 +264,7 @@ mod tests {
 
     `TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo test`
 
-    The `Database`` trait is very simple and we only have one driver that needs
+    The `Database` trait is very simple and we only have one driver that needs
     a container. In the future we might want to use different approaches like:
 
     - https://github.com/testcontainers/testcontainers-rs/issues/707

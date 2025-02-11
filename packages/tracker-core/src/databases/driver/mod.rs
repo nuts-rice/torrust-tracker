@@ -96,10 +96,7 @@ mod tests {
         // tests, we share the same database. If we want to isolate the tests in
         // the future, we can create a new database for each test.
 
-        create_database_tables(driver).await.unwrap();
-
-        // todo: truncate tables otherwise they will increase in size over time.
-        // That's not a problem on CI when the database is always newly created.
+        database_setup(driver).await;
 
         // Persistent torrents (stats)
 
@@ -121,8 +118,22 @@ mod tests {
         handling_the_whitelist::it_should_remove_an_infohash_from_the_whitelist(driver);
         handling_the_whitelist::it_should_fail_trying_to_add_the_same_infohash_twice(driver);
         handling_the_whitelist::it_load_the_whitelist(driver);
+    }
 
-        driver.drop_database_tables().unwrap();
+    /// It initializes the database schema.
+    ///
+    /// Since the drop SQL queries don't check if the tables already exist,
+    /// we have to create them first, and then drop them.
+    ///
+    /// The method to drop tables does not use "DROP TABLE IF EXISTS". We can
+    /// change this function when we update the `Database::drop_database_tables`
+    /// method to use "DROP TABLE IF EXISTS".
+    async fn database_setup(driver: &Arc<Box<dyn Database>>) {
+        create_database_tables(driver).await.expect("database tables creation failed");
+        driver.drop_database_tables().expect("old database tables deletion failed");
+        create_database_tables(driver)
+            .await
+            .expect("database tables creation from empty schema failed");
     }
 
     async fn create_database_tables(driver: &Arc<Box<dyn Database>>) -> Result<(), Box<dyn std::error::Error>> {
