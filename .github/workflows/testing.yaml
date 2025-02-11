@@ -146,6 +146,10 @@ jobs:
         name: Run Unit Tests
         run: cargo test --tests --benches --examples --workspace --all-targets --all-features
 
+      - id: database
+        name: Run MySQL Database Tests
+        run: TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo test --package bittorrent-tracker-core
+
   e2e:
     name: E2E
     runs-on: ubuntu-latest

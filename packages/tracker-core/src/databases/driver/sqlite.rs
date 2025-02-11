@@ -288,3 +288,39 @@ impl Database for Sqlite {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use std::sync::Arc;
+
+    use torrust_tracker_configuration::Core;
+    use torrust_tracker_test_helpers::configuration::ephemeral_sqlite_database;
+
+    use crate::databases::driver::sqlite::Sqlite;
+    use crate::databases::driver::tests::run_tests;
+    use crate::databases::Database;
+
+    fn ephemeral_configuration() -> Core {
+        let mut config = Core::default();
+        let temp_file = ephemeral_sqlite_database();
+        temp_file.to_str().unwrap().clone_into(&mut config.database.path);
+        config
+    }
+
+    fn initialize_driver(config: &Core) -> Arc<Box<dyn Database>> {
+        let driver: Arc<Box<dyn Database>> = Arc::new(Box::new(Sqlite::new(&config.database.path).unwrap()));
+        driver
+    }
+
+    #[tokio::test]
+    async fn run_sqlite_driver_tests() -> Result<(), Box<dyn std::error::Error + 'static>> {
+        let config = ephemeral_configuration();
+
+        let driver = initialize_driver(&config);
+
+        run_tests(&driver).await;
+
+        Ok(())
+    }
+}

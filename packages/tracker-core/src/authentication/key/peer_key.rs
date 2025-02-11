@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::time::Duration;
 
 use derive_more::Display;
 use rand::distr::Alphanumeric;
@@ -12,7 +13,7 @@ use super::AUTH_KEY_LENGTH;
 
 /// An authentication key which can potentially have an expiration time.
 /// After that time is will automatically become invalid.
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PeerKey {
     /// Random 32-char string. For example: `YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ`
     pub key: Key,
@@ -21,6 +22,21 @@ pub struct PeerKey {
     /// If `None` the keys will not expire (permanent key).
     pub valid_until: Option<DurationSinceUnixEpoch>,
 }
+
+impl PartialEq for PeerKey {
+    fn eq(&self, other: &Self) -> bool {
+        // We ignore the fractions of seconds when comparing the timestamps
+        // because we only store the seconds in the database.
+        self.key == other.key
+            && match (&self.valid_until, &other.valid_until) {
+                (Some(a), Some(b)) => a.as_secs() == b.as_secs(),
+                (None, None) => true,
+                _ => false,
+            }
+    }
+}
+
+impl Eq for PeerKey {}
 
 impl std::fmt::Display for PeerKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -47,7 +63,10 @@ impl PeerKey {
     /// (this will naturally happen in 292.5 billion years)
     #[must_use]
     pub fn expiry_time(&self) -> Option<chrono::DateTime<chrono::Utc>> {
-        self.valid_until.map(convert_from_timestamp_to_datetime_utc)
+        // We remove the fractions of seconds because we only store the seconds
+        // in the database.
+        self.valid_until
+            .map(|valid_until| convert_from_timestamp_to_datetime_utc(Duration::from_secs(valid_until.as_secs())))
     }
 }
 
