@@ -67,6 +67,12 @@ pub fn generate_permanent_key() -> PeerKey {
     generate_key(None)
 }
 
+/// It generates a new expiring random key [`PeerKey`].
+#[must_use]
+pub fn generate_expiring_key(lifetime: Duration) -> PeerKey {
+    generate_key(Some(lifetime))
+}
+
 /// It generates a new random 32-char authentication [`PeerKey`].
 ///
 /// It can be an expiring or permanent key.
