@@ -29,8 +29,11 @@ pub mod manager;
 pub mod repository;
 pub mod services;
 
-use torrust_tracker_torrent_repository::{EntryMutexStd, TorrentsSkipMapMutexStd};
+#[cfg(test)]
+use torrust_tracker_torrent_repository::EntryMutexStd;
+use torrust_tracker_torrent_repository::TorrentsSkipMapMutexStd;
 
 // Currently used types from the torrent repository crate.
-pub type Torrents = TorrentsSkipMapMutexStd;
-pub type TorrentEntry = EntryMutexStd;
+pub(crate) type Torrents = TorrentsSkipMapMutexStd;
+#[cfg(test)]
+pub(crate) type TorrentEntry = EntryMutexStd;

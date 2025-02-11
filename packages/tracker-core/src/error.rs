@@ -41,8 +41,8 @@ mod tests {
 
     mod whitelist_error {
 
-        use crate::core_tests::sample_info_hash;
         use crate::error::WhitelistError;
+        use crate::test_helpers::tests::sample_info_hash;
 
         #[test]
         fn torrent_not_whitelisted() {

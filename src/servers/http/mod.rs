@@ -306,6 +306,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod server;
+pub mod test_helpers;
 pub mod v1;
 
 pub const HTTP_TRACKER_LOG_TARGET: &str = "HTTP TRACKER";

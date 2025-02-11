@@ -2,7 +2,7 @@ pub mod authorization;
 pub mod manager;
 pub mod repository;
 pub mod setup;
-pub mod whitelist_tests;
+pub mod test_helpers;
 
 #[cfg(test)]
 mod tests {
@@ -10,8 +10,8 @@ mod tests {
     mod configured_as_whitelisted {
 
         mod handling_authorization {
-            use crate::core_tests::sample_info_hash;
-            use crate::whitelist::whitelist_tests::initialize_whitelist_services_for_listed_tracker;
+            use crate::test_helpers::tests::sample_info_hash;
+            use crate::whitelist::test_helpers::tests::initialize_whitelist_services_for_listed_tracker;
 
             #[tokio::test]
             async fn it_should_authorize_the_announce_and_scrape_actions_on_whitelisted_torrents() {

@@ -29,7 +29,7 @@ impl DatabasePersistentTorrentRepository {
     /// # Errors
     ///
     /// Will return a database `Err` if unable to load.
-    pub fn load_all(&self) -> Result<PersistentTorrents, Error> {
+    pub(crate) fn load_all(&self) -> Result<PersistentTorrents, Error> {
         self.database.load_persistent_torrents()
     }
 
@@ -38,7 +38,7 @@ impl DatabasePersistentTorrentRepository {
     /// # Errors
     ///
     /// Will return a database `Err` if unable to save.
-    pub fn save(&self, info_hash: &InfoHash, downloaded: u32) -> Result<(), Error> {
+    pub(crate) fn save(&self, info_hash: &InfoHash, downloaded: u32) -> Result<(), Error> {
         self.database.save_persistent_torrent(info_hash, downloaded)
     }
 }
@@ -49,8 +49,8 @@ mod tests {
     use torrust_tracker_primitives::PersistentTorrents;
 
     use super::DatabasePersistentTorrentRepository;
-    use crate::core_tests::{ephemeral_configuration, sample_info_hash, sample_info_hash_one, sample_info_hash_two};
     use crate::databases::setup::initialize_database;
+    use crate::test_helpers::tests::{ephemeral_configuration, sample_info_hash, sample_info_hash_one, sample_info_hash_two};
 
     fn initialize_db_persistent_torrent_repository() -> DatabasePersistentTorrentRepository {
         let config = ephemeral_configuration();

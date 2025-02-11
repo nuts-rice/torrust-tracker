@@ -88,8 +88,8 @@ mod tests {
 
             use torrust_tracker_configuration::Core;
 
-            use crate::core_tests::sample_info_hash;
             use crate::error::WhitelistError;
+            use crate::test_helpers::tests::sample_info_hash;
             use crate::whitelist::authorization::tests::the_whitelist_authorization_for_announce_and_scrape_actions::{
                 initialize_whitelist_authorization_and_dependencies_with, initialize_whitelist_authorization_with,
             };
@@ -129,7 +129,7 @@ mod tests {
 
             use torrust_tracker_configuration::Core;
 
-            use crate::core_tests::sample_info_hash;
+            use crate::test_helpers::tests::sample_info_hash;
             use crate::whitelist::authorization::tests::the_whitelist_authorization_for_announce_and_scrape_actions::{
                 initialize_whitelist_authorization_and_dependencies_with, initialize_whitelist_authorization_with,
             };

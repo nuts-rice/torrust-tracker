@@ -182,8 +182,8 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use crate::announce_handler::AnnounceHandler;
-        use crate::core_tests::initialize_handlers;
         use crate::scrape_handler::ScrapeHandler;
+        use crate::test_helpers::tests::initialize_handlers;
 
         fn public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
@@ -244,7 +244,7 @@ mod tests {
                     peer_ip, public_tracker, sample_peer_1, sample_peer_2, sample_peer_3,
                 };
                 use crate::announce_handler::PeersWanted;
-                use crate::core_tests::{sample_info_hash, sample_peer};
+                use crate::test_helpers::tests::{sample_info_hash, sample_peer};
 
                 mod should_assign_the_ip_to_the_peer {
 
@@ -411,7 +411,7 @@ mod tests {
 
                     use crate::announce_handler::tests::the_announce_handler::{peer_ip, public_tracker};
                     use crate::announce_handler::PeersWanted;
-                    use crate::core_tests::{completed_peer, leecher, sample_info_hash, seeder, started_peer};
+                    use crate::test_helpers::tests::{completed_peer, leecher, sample_info_hash, seeder, started_peer};
 
                     #[tokio::test]
                     async fn when_the_peer_is_a_seeder() {
@@ -474,8 +474,8 @@ mod tests {
 
             use crate::announce_handler::tests::the_announce_handler::peer_ip;
             use crate::announce_handler::{AnnounceHandler, PeersWanted};
-            use crate::core_tests::{sample_info_hash, sample_peer};
             use crate::databases::setup::initialize_database;
+            use crate::test_helpers::tests::{sample_info_hash, sample_peer};
             use crate::torrent::manager::TorrentsManager;
             use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
             use crate::torrent::repository::persisted::DatabasePersistentTorrentRepository;

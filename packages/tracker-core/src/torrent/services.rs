@@ -302,7 +302,7 @@ mod tests {
 
         use std::sync::Arc;
 
-        use crate::core_tests::sample_info_hash;
+        use crate::test_helpers::tests::sample_info_hash;
         use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
         use crate::torrent::services::tests::sample_peer;
         use crate::torrent::services::{get_torrents, BasicInfo};

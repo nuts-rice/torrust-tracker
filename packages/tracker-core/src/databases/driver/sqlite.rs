@@ -14,7 +14,7 @@ use crate::authentication::{self, Key};
 
 const DRIVER: Driver = Driver::Sqlite3;
 
-pub struct Sqlite {
+pub(crate) struct Sqlite {
     pool: Pool<SqliteConnectionManager>,
 }
 

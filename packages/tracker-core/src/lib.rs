@@ -391,8 +391,8 @@ pub mod scrape_handler;
 pub mod torrent;
 pub mod whitelist;
 
-pub mod core_tests;
 pub mod peer_tests;
+pub mod test_helpers;
 
 use torrust_tracker_clock::clock;
 /// This code needs to be copied into each crate.
@@ -416,8 +416,8 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use crate::announce_handler::AnnounceHandler;
-        use crate::core_tests::initialize_handlers;
         use crate::scrape_handler::ScrapeHandler;
+        use crate::test_helpers::tests::initialize_handlers;
 
         fn initialize_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
@@ -445,7 +445,7 @@ mod tests {
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::announce_handler::PeersWanted;
-                use crate::core_tests::{complete_peer, incomplete_peer};
+                use crate::test_helpers::tests::{complete_peer, incomplete_peer};
                 use crate::tests::the_tracker::initialize_handlers_for_public_tracker;
 
                 #[tokio::test]
@@ -500,7 +500,7 @@ mod tests {
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::announce_handler::PeersWanted;
-                use crate::core_tests::{complete_peer, incomplete_peer};
+                use crate::test_helpers::tests::{complete_peer, incomplete_peer};
                 use crate::tests::the_tracker::{initialize_handlers_for_listed_tracker, peer_ip};
 
                 #[tokio::test]
