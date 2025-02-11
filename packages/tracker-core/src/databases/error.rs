@@ -102,3 +102,39 @@ impl From<(r2d2::Error, Driver)> for Error {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use r2d2_mysql::mysql;
+
+    use crate::databases::error::Error;
+
+    #[test]
+    fn it_should_build_a_database_error_from_a_rusqlite_error() {
+        let err: Error = r2d2_sqlite::rusqlite::Error::InvalidQuery.into();
+
+        assert!(matches!(err, Error::InvalidQuery { .. }));
+    }
+
+    #[test]
+    fn it_should_build_an_specific_database_error_from_a_no_rows_returned_rusqlite_error() {
+        let err: Error = r2d2_sqlite::rusqlite::Error::QueryReturnedNoRows.into();
+
+        assert!(matches!(err, Error::QueryReturnedNoRows { .. }));
+    }
+
+    #[test]
+    fn it_should_build_a_database_error_from_a_mysql_error() {
+        let url_err = mysql::error::UrlError::BadUrl;
+        let err: Error = r2d2_mysql::mysql::Error::UrlError(url_err).into();
+
+        assert!(matches!(err, Error::InvalidQuery { .. }));
+    }
+
+    #[test]
+    fn it_should_build_a_database_error_from_a_mysql_url_error() {
+        let err: Error = mysql::error::UrlError::BadUrl.into();
+
+        assert!(matches!(err, Error::ConnectionError { .. }));
+    }
+}
