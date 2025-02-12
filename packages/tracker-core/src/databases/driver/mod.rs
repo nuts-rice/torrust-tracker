@@ -73,7 +73,7 @@ pub mod sqlite;
 /// # Errors
 ///
 /// Will return `Error` if unable to build the driver.
-pub fn build(driver: &Driver, db_path: &str) -> Result<Box<dyn Database>, Error> {
+pub(crate) fn build(driver: &Driver, db_path: &str) -> Result<Box<dyn Database>, Error> {
     let database: Box<dyn Database> = match driver {
         Driver::Sqlite3 => Box::new(Sqlite::new(db_path)?),
         Driver::MySQL => Box::new(Mysql::new(db_path)?),
@@ -85,7 +85,7 @@ pub fn build(driver: &Driver, db_path: &str) -> Result<Box<dyn Database>, Error>
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -152,8 +152,8 @@ mod tests {
 
         use std::sync::Arc;
 
-        use crate::core_tests::sample_info_hash;
         use crate::databases::Database;
+        use crate::test_helpers::tests::sample_info_hash;
 
         pub fn it_should_save_and_load_persistent_torrents(driver: &Arc<Box<dyn Database>>) {
             let infohash = sample_info_hash();
@@ -232,8 +232,8 @@ mod tests {
 
         use std::sync::Arc;
 
-        use crate::core_tests::random_info_hash;
         use crate::databases::Database;
+        use crate::test_helpers::tests::random_info_hash;
 
         pub fn it_should_load_the_whitelist(driver: &Arc<Box<dyn Database>>) {
             let infohash = random_info_hash();

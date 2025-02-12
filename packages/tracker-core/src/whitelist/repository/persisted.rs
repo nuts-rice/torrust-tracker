@@ -22,7 +22,7 @@ impl DatabaseWhitelist {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to add the `info_hash` to the whitelist database.
-    pub fn add(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
+    pub(crate) fn add(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
         let is_whitelisted = self.database.is_info_hash_whitelisted(*info_hash)?;
 
         if is_whitelisted {
@@ -39,7 +39,7 @@ impl DatabaseWhitelist {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to remove the `info_hash` from the whitelist database.
-    pub fn remove(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
+    pub(crate) fn remove(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
         let is_whitelisted = self.database.is_info_hash_whitelisted(*info_hash)?;
 
         if !is_whitelisted {
@@ -56,7 +56,7 @@ impl DatabaseWhitelist {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to load the list whitelisted `info_hash`s from the database.
-    pub fn load_from_database(&self) -> Result<Vec<InfoHash>, databases::error::Error> {
+    pub(crate) fn load_from_database(&self) -> Result<Vec<InfoHash>, databases::error::Error> {
         self.database.load_whitelist()
     }
 }
@@ -65,8 +65,8 @@ impl DatabaseWhitelist {
 mod tests {
     mod the_persisted_whitelist_repository {
 
-        use crate::core_tests::{ephemeral_configuration_for_listed_tracker, sample_info_hash};
         use crate::databases::setup::initialize_database;
+        use crate::test_helpers::tests::{ephemeral_configuration_for_listed_tracker, sample_info_hash};
         use crate::whitelist::repository::persisted::DatabaseWhitelist;
 
         fn initialize_database_whitelist() -> DatabaseWhitelist {

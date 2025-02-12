@@ -16,6 +16,7 @@ pub struct TorrentsManager {
     in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
 
     /// The persistent torrents repository.
+    #[allow(dead_code)]
     db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
 }
 
@@ -40,7 +41,8 @@ impl TorrentsManager {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to load the list of `persistent_torrents` from the database.
-    pub fn load_torrents_from_database(&self) -> Result<(), databases::error::Error> {
+    #[allow(dead_code)]
+    pub(crate) fn load_torrents_from_database(&self) -> Result<(), databases::error::Error> {
         let persistent_torrents = self.db_torrent_repository.load_all()?;
 
         self.in_memory_torrent_repository.import_persistent(&persistent_torrents);
@@ -71,8 +73,8 @@ mod tests {
     use torrust_tracker_torrent_repository::entry::EntrySync;
 
     use super::{DatabasePersistentTorrentRepository, TorrentsManager};
-    use crate::core_tests::{ephemeral_configuration, sample_info_hash};
     use crate::databases::setup::initialize_database;
+    use crate::test_helpers::tests::{ephemeral_configuration, sample_info_hash};
     use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
     struct TorrentsManagerDeps {
@@ -138,7 +140,7 @@ mod tests {
         use torrust_tracker_clock::clock::{self};
         use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
-        use crate::core_tests::{ephemeral_configuration, sample_info_hash, sample_peer};
+        use crate::test_helpers::tests::{ephemeral_configuration, sample_info_hash, sample_peer};
         use crate::torrent::manager::tests::{initialize_torrents_manager, initialize_torrents_manager_with};
         use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 

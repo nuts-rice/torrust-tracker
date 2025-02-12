@@ -132,7 +132,7 @@ impl KeysHandler {
     /// # Errors
     ///
     /// Will return a `database::Error` if unable to add the `auth_key` to the database.
-    pub async fn generate_permanent_peer_key(&self) -> Result<PeerKey, databases::error::Error> {
+    pub(crate) async fn generate_permanent_peer_key(&self) -> Result<PeerKey, databases::error::Error> {
         self.generate_expiring_peer_key(None).await
     }
 
@@ -170,7 +170,7 @@ impl KeysHandler {
     /// # Arguments
     ///
     /// * `key` - The pre-generated key.
-    pub async fn add_permanent_peer_key(&self, key: Key) -> Result<PeerKey, databases::error::Error> {
+    pub(crate) async fn add_permanent_peer_key(&self, key: Key) -> Result<PeerKey, databases::error::Error> {
         self.add_expiring_peer_key(key, None).await
     }
 
@@ -188,7 +188,7 @@ impl KeysHandler {
     /// * `key` - The pre-generated key.
     /// * `lifetime` - The duration in seconds for the new key. The key will be
     ///   no longer valid after `lifetime` seconds.
-    pub async fn add_expiring_peer_key(
+    pub(crate) async fn add_expiring_peer_key(
         &self,
         key: Key,
         valid_until: Option<DurationSinceUnixEpoch>,
@@ -219,7 +219,7 @@ impl KeysHandler {
     }
 
     /// It removes an authentication key from memory.
-    pub async fn remove_in_memory_auth_key(&self, key: &Key) {
+    pub(crate) async fn remove_in_memory_auth_key(&self, key: &Key) {
         self.in_memory_key_repository.remove(key).await;
     }
 

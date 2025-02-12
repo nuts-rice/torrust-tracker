@@ -32,33 +32,34 @@ impl InMemoryTorrentRepository {
         self.torrents.upsert_peer(info_hash, peer);
     }
 
+    #[cfg(test)]
     #[must_use]
-    pub fn remove(&self, key: &InfoHash) -> Option<EntryMutexStd> {
+    pub(crate) fn remove(&self, key: &InfoHash) -> Option<EntryMutexStd> {
         self.torrents.remove(key)
     }
 
-    pub fn remove_inactive_peers(&self, current_cutoff: DurationSinceUnixEpoch) {
+    pub(crate) fn remove_inactive_peers(&self, current_cutoff: DurationSinceUnixEpoch) {
         self.torrents.remove_inactive_peers(current_cutoff);
     }
 
-    pub fn remove_peerless_torrents(&self, policy: &TrackerPolicy) {
+    pub(crate) fn remove_peerless_torrents(&self, policy: &TrackerPolicy) {
         self.torrents.remove_peerless_torrents(policy);
     }
 
     #[must_use]
-    pub fn get(&self, key: &InfoHash) -> Option<EntryMutexStd> {
+    pub(crate) fn get(&self, key: &InfoHash) -> Option<EntryMutexStd> {
         self.torrents.get(key)
     }
 
     #[must_use]
-    pub fn get_paginated(&self, pagination: Option<&Pagination>) -> Vec<(InfoHash, EntryMutexStd)> {
+    pub(crate) fn get_paginated(&self, pagination: Option<&Pagination>) -> Vec<(InfoHash, EntryMutexStd)> {
         self.torrents.get_paginated(pagination)
     }
 
     /// It returns the data for a `scrape` response or empty if the torrent is
     /// not found.
     #[must_use]
-    pub fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
+    pub(crate) fn get_swarm_metadata(&self, info_hash: &InfoHash) -> SwarmMetadata {
         match self.torrents.get(info_hash) {
             Some(torrent_entry) => torrent_entry.get_swarm_metadata(),
             None => SwarmMetadata::zeroed(),
@@ -69,7 +70,7 @@ impl InMemoryTorrentRepository {
     ///
     /// It filters out the client making the request.
     #[must_use]
-    pub fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
+    pub(crate) fn get_peers_for(&self, info_hash: &InfoHash, peer: &peer::Peer, limit: usize) -> Vec<Arc<peer::Peer>> {
         match self.torrents.get(info_hash) {
             None => vec![],
             Some(entry) => entry.get_peers_for_client(&peer.peer_addr, Some(max(limit, TORRENT_PEERS_LIMIT))),
@@ -135,7 +136,7 @@ mod tests {
 
             use std::sync::Arc;
 
-            use crate::core_tests::{sample_info_hash, sample_peer};
+            use crate::test_helpers::tests::{sample_info_hash, sample_peer};
             use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
             #[tokio::test]
@@ -171,7 +172,7 @@ mod tests {
             use torrust_tracker_primitives::peer::Peer;
             use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
-            use crate::core_tests::{sample_info_hash, sample_peer};
+            use crate::test_helpers::tests::{sample_info_hash, sample_peer};
             use crate::torrent::repository::in_memory::tests::the_in_memory_torrent_repository::numeric_peer_id;
             use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
@@ -233,7 +234,7 @@ mod tests {
                 use torrust_tracker_primitives::peer::Peer;
                 use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
-                use crate::core_tests::{sample_info_hash, sample_peer};
+                use crate::test_helpers::tests::{sample_info_hash, sample_peer};
                 use crate::torrent::repository::in_memory::tests::the_in_memory_torrent_repository::numeric_peer_id;
                 use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
@@ -303,7 +304,7 @@ mod tests {
             use torrust_tracker_configuration::TrackerPolicy;
             use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
-            use crate::core_tests::{sample_info_hash, sample_peer};
+            use crate::test_helpers::tests::{sample_info_hash, sample_peer};
             use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
             #[tokio::test]
@@ -374,7 +375,7 @@ mod tests {
             use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
             use torrust_tracker_torrent_repository::entry::EntrySync;
 
-            use crate::core_tests::{sample_info_hash, sample_peer};
+            use crate::test_helpers::tests::{sample_info_hash, sample_peer};
             use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
             use crate::torrent::TorrentEntry;
 
@@ -429,7 +430,7 @@ mod tests {
 
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
-                use crate::core_tests::{sample_info_hash, sample_peer};
+                use crate::test_helpers::tests::{sample_info_hash, sample_peer};
                 use crate::torrent::repository::in_memory::tests::the_in_memory_torrent_repository::returning_torrent_entries::TorrentEntryInfo;
                 use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
@@ -467,7 +468,7 @@ mod tests {
                     use torrust_tracker_primitives::pagination::Pagination;
                     use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
-                    use crate::core_tests::{
+                    use crate::test_helpers::tests::{
                         sample_info_hash_alphabetically_ordered_after_sample_info_hash_one, sample_info_hash_one,
                         sample_peer_one, sample_peer_two,
                     };
@@ -577,7 +578,7 @@ mod tests {
             use bittorrent_primitives::info_hash::fixture::gen_seeded_infohash;
             use torrust_tracker_primitives::torrent_metrics::TorrentsMetrics;
 
-            use crate::core_tests::{complete_peer, leecher, sample_info_hash, seeder};
+            use crate::test_helpers::tests::{complete_peer, leecher, sample_info_hash, seeder};
             use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
             // todo: refactor to use test parametrization
@@ -689,7 +690,7 @@ mod tests {
 
             use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
-            use crate::core_tests::{leecher, sample_info_hash};
+            use crate::test_helpers::tests::{leecher, sample_info_hash};
             use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
             #[tokio::test]
@@ -728,7 +729,7 @@ mod tests {
 
             use torrust_tracker_primitives::PersistentTorrents;
 
-            use crate::core_tests::sample_info_hash;
+            use crate::test_helpers::tests::sample_info_hash;
             use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
             #[tokio::test]

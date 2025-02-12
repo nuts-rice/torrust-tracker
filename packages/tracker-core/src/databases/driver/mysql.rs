@@ -15,7 +15,7 @@ use crate::authentication::{self, Key};
 
 const DRIVER: Driver = Driver::MySQL;
 
-pub struct Mysql {
+pub(crate) struct Mysql {
     pool: Pool<MySqlConnectionManager>,
 }
 

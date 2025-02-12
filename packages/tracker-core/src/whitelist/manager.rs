@@ -73,9 +73,9 @@ mod tests {
 
     use torrust_tracker_configuration::Core;
 
-    use crate::core_tests::ephemeral_configuration_for_listed_tracker;
     use crate::databases::setup::initialize_database;
     use crate::databases::Database;
+    use crate::test_helpers::tests::ephemeral_configuration_for_listed_tracker;
     use crate::whitelist::manager::WhitelistManager;
     use crate::whitelist::repository::in_memory::InMemoryWhitelist;
     use crate::whitelist::repository::persisted::DatabaseWhitelist;
@@ -111,7 +111,7 @@ mod tests {
     mod configured_as_whitelisted {
 
         mod handling_the_torrent_whitelist {
-            use crate::core_tests::sample_info_hash;
+            use crate::test_helpers::tests::sample_info_hash;
             use crate::whitelist::manager::tests::initialize_whitelist_manager_for_whitelisted_tracker;
 
             #[tokio::test]
@@ -141,7 +141,7 @@ mod tests {
             }
 
             mod persistence {
-                use crate::core_tests::sample_info_hash;
+                use crate::test_helpers::tests::sample_info_hash;
                 use crate::whitelist::manager::tests::initialize_whitelist_manager_for_whitelisted_tracker;
 
                 #[tokio::test]
