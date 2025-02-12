@@ -14,7 +14,7 @@ impl InMemoryWhitelist {
     }
 
     /// It removes a torrent from the whitelist in memory.
-    pub async fn remove(&self, info_hash: &InfoHash) -> bool {
+    pub(crate) async fn remove(&self, info_hash: &InfoHash) -> bool {
         self.whitelist.write().await.remove(info_hash)
     }
 
@@ -24,7 +24,7 @@ impl InMemoryWhitelist {
     }
 
     /// It clears the whitelist.
-    pub async fn clear(&self) {
+    pub(crate) async fn clear(&self) {
         let mut whitelist = self.whitelist.write().await;
         whitelist.clear();
     }
@@ -33,7 +33,7 @@ impl InMemoryWhitelist {
 #[cfg(test)]
 mod tests {
 
-    use crate::core_tests::sample_info_hash;
+    use crate::test_helpers::tests::sample_info_hash;
     use crate::whitelist::repository::in_memory::InMemoryWhitelist;
 
     #[tokio::test]

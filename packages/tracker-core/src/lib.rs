@@ -391,8 +391,8 @@ pub mod scrape_handler;
 pub mod torrent;
 pub mod whitelist;
 
-pub mod core_tests;
 pub mod peer_tests;
+pub mod test_helpers;
 
 use torrust_tracker_clock::clock;
 /// This code needs to be copied into each crate.
@@ -416,8 +416,8 @@ mod tests {
         use torrust_tracker_test_helpers::configuration;
 
         use crate::announce_handler::AnnounceHandler;
-        use crate::core_tests::initialize_handlers;
         use crate::scrape_handler::ScrapeHandler;
+        use crate::test_helpers::tests::initialize_handlers;
 
         fn initialize_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
             let config = configuration::ephemeral_public();
@@ -445,7 +445,7 @@ mod tests {
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::announce_handler::PeersWanted;
-                use crate::core_tests::{complete_peer, incomplete_peer};
+                use crate::test_helpers::tests::{complete_peer, incomplete_peer};
                 use crate::tests::the_tracker::initialize_handlers_for_public_tracker;
 
                 #[tokio::test]
@@ -460,7 +460,7 @@ mod tests {
                         &info_hash,
                         &mut complete_peer,
                         &IpAddr::V4(Ipv4Addr::new(126, 0, 0, 10)),
-                        &PeersWanted::All,
+                        &PeersWanted::AsManyAsPossible,
                     );
 
                     // Announce an "incomplete" peer for the torrent
@@ -469,7 +469,7 @@ mod tests {
                         &info_hash,
                         &mut incomplete_peer,
                         &IpAddr::V4(Ipv4Addr::new(126, 0, 0, 11)),
-                        &PeersWanted::All,
+                        &PeersWanted::AsManyAsPossible,
                     );
 
                     // Scrape
@@ -500,7 +500,7 @@ mod tests {
                 use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
                 use crate::announce_handler::PeersWanted;
-                use crate::core_tests::{complete_peer, incomplete_peer};
+                use crate::test_helpers::tests::{complete_peer, incomplete_peer};
                 use crate::tests::the_tracker::{initialize_handlers_for_listed_tracker, peer_ip};
 
                 #[tokio::test]
@@ -510,11 +510,11 @@ mod tests {
                     let info_hash = "3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0".parse::<InfoHash>().unwrap(); // DevSkim: ignore DS173237
 
                     let mut peer = incomplete_peer();
-                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
 
                     // Announce twice to force non zeroed swarm metadata
                     let mut peer = complete_peer();
-                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::All);
+                    announce_handler.announce(&info_hash, &mut peer, &peer_ip(), &PeersWanted::AsManyAsPossible);
 
                     let scrape_data = scrape_handler.scrape(&vec![info_hash]).await;
 

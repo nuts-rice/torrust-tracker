@@ -59,12 +59,20 @@ pub type ParseKeyError = peer_key::ParseKeyError;
 ///
 /// For more information see function [`generate_key`](crate::authentication::key::generate_key) to generate the
 /// [`PeerKey`](crate::authentication::PeerKey).
-pub const AUTH_KEY_LENGTH: usize = 32;
+pub(crate) const AUTH_KEY_LENGTH: usize = 32;
 
 /// It generates a new permanent random key [`PeerKey`].
+#[cfg(test)]
 #[must_use]
-pub fn generate_permanent_key() -> PeerKey {
+pub(crate) fn generate_permanent_key() -> PeerKey {
     generate_key(None)
+}
+
+/// It generates a new expiring random key [`PeerKey`].
+#[cfg(test)]
+#[must_use]
+pub(crate) fn generate_expiring_key(lifetime: Duration) -> PeerKey {
+    generate_key(Some(lifetime))
 }
 
 /// It generates a new random 32-char authentication [`PeerKey`].

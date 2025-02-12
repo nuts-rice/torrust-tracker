@@ -137,7 +137,7 @@ mod tests {
         use crate::torrent::services::{get_torrent_info, Info};
 
         #[tokio::test]
-        async fn should_return_none_if_the_tracker_does_not_have_the_torrent() {
+        async fn it_should_return_none_if_the_tracker_does_not_have_the_torrent() {
             let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
 
             let torrent_info = get_torrent_info(
@@ -149,7 +149,7 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn should_return_the_torrent_info_if_the_tracker_has_the_torrent() {
+        async fn it_should_return_the_torrent_info_if_the_tracker_has_the_torrent() {
             let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned(); // DevSkim: ignore DS173237
@@ -183,7 +183,7 @@ mod tests {
         use crate::torrent::services::{get_torrents_page, BasicInfo, Pagination};
 
         #[tokio::test]
-        async fn should_return_an_empty_result_if_the_tracker_does_not_have_any_torrent() {
+        async fn it_should_return_an_empty_result_if_the_tracker_does_not_have_any_torrent() {
             let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
 
             let torrents = get_torrents_page(&in_memory_torrent_repository, Some(&Pagination::default()));
@@ -192,7 +192,7 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn should_return_a_summarized_info_for_all_torrents() {
+        async fn it_should_return_a_summarized_info_for_all_torrents() {
             let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
 
             let hash = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned(); // DevSkim: ignore DS173237
@@ -214,13 +214,13 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn should_allow_limiting_the_number_of_torrents_in_the_result() {
+        async fn it_should_allow_limiting_the_number_of_torrents_in_the_result() {
             let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned(); // DevSkim: ignore DS173237
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
 
-            let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned();
+            let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned(); // DevSkim: ignore DS173237
             let info_hash2 = InfoHash::from_str(&hash2).unwrap();
 
             let () = in_memory_torrent_repository.upsert_peer(&info_hash1, &sample_peer());
@@ -235,13 +235,13 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn should_allow_using_pagination_in_the_result() {
+        async fn it_should_allow_using_pagination_in_the_result() {
             let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned(); // DevSkim: ignore DS173237
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
 
-            let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned();
+            let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned(); // DevSkim: ignore DS173237
             let info_hash2 = InfoHash::from_str(&hash2).unwrap();
 
             let () = in_memory_torrent_repository.upsert_peer(&info_hash1, &sample_peer());
@@ -265,14 +265,14 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn should_return_torrents_ordered_by_info_hash() {
+        async fn it_should_return_torrents_ordered_by_info_hash() {
             let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
 
             let hash1 = "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_owned(); // DevSkim: ignore DS173237
             let info_hash1 = InfoHash::from_str(&hash1).unwrap();
             let () = in_memory_torrent_repository.upsert_peer(&info_hash1, &sample_peer());
 
-            let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned();
+            let hash2 = "03840548643af2a7b63a9f5cbca348bc7150ca3a".to_owned(); // DevSkim: ignore DS173237
             let info_hash2 = InfoHash::from_str(&hash2).unwrap();
             let () = in_memory_torrent_repository.upsert_peer(&info_hash2, &sample_peer());
 
@@ -294,6 +294,46 @@ mod tests {
                         leechers: 0,
                     }
                 ]
+            );
+        }
+    }
+
+    mod getting_basic_torrent_info_for_multiple_torrents_at_once {
+
+        use std::sync::Arc;
+
+        use crate::test_helpers::tests::sample_info_hash;
+        use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
+        use crate::torrent::services::tests::sample_peer;
+        use crate::torrent::services::{get_torrents, BasicInfo};
+
+        #[tokio::test]
+        async fn it_should_return_an_empty_list_if_none_of_the_requested_torrents_is_found() {
+            let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+
+            let torrent_info = get_torrents(&in_memory_torrent_repository, &[sample_info_hash()]);
+
+            assert!(torrent_info.is_empty());
+        }
+
+        #[tokio::test]
+        async fn it_should_return_a_list_with_basic_info_about_the_requested_torrents() {
+            let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+
+            let info_hash = sample_info_hash();
+
+            let () = in_memory_torrent_repository.upsert_peer(&info_hash, &sample_peer());
+
+            let torrent_info = get_torrents(&in_memory_torrent_repository, &[info_hash]);
+
+            assert_eq!(
+                torrent_info,
+                vec!(BasicInfo {
+                    info_hash,
+                    seeders: 1,
+                    completed: 0,
+                    leechers: 0,
+                })
             );
         }
     }

@@ -10,6 +10,30 @@ You usually don’t need to use this library directly. Instead, you should use t
 
 [Crate documentation](https://docs.rs/bittorrent-tracker-core).
 
+## Testing
+
+Run tests including tests for MySQL driver:
+
+```console
+TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo test
+```
+
+> NOTE: MySQL driver requires docker to run. We don't run them by default because we don't want to run them when we build container images. The Torrust Tracker container build runs unit tests for all dependencies, including this library.
+
+Show coverage report:
+
+```console
+TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo +stable llvm-cov
+```
+
+Export coverage report to `lcov` format:
+
+```console
+TORRUST_TRACKER_CORE_RUN_MYSQL_DRIVER_TEST=true cargo +stable llvm-cov --lcov --output-path=./.coverage/lcov.info
+```
+
+If you use Visual Studio Code, you can use the [Coverage Gutters](https://marketplace.visualstudio.com/items?itemName=semasquare.vscode-coverage-gutters) extension to view the coverage lines.
+
 ## License
 
 The project is licensed under the terms of the [GNU AFFERO GENERAL PUBLIC LICENSE](./LICENSE).

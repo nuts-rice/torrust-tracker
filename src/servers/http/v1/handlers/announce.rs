@@ -175,7 +175,7 @@ async fn handle_announce(
     let mut peer = peer_from_request(announce_request, &peer_ip);
     let peers_wanted = match announce_request.numwant {
         Some(numwant) => PeersWanted::only(numwant),
-        None => PeersWanted::All,
+        None => PeersWanted::AsManyAsPossible,
     };
 
     let announce_data = services::announce::invoke(
@@ -254,7 +254,6 @@ mod tests {
     use bittorrent_tracker_core::announce_handler::AnnounceHandler;
     use bittorrent_tracker_core::authentication::key::repository::in_memory::InMemoryKeyRepository;
     use bittorrent_tracker_core::authentication::service::AuthenticationService;
-    use bittorrent_tracker_core::core_tests::sample_info_hash;
     use bittorrent_tracker_core::databases::setup::initialize_database;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
     use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
@@ -264,6 +263,7 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::packages::http_tracker_core;
+    use crate::servers::http::test_helpers::tests::sample_info_hash;
 
     struct CoreTrackerServices {
         pub core_config: Arc<Core>,

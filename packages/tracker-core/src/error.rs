@@ -1,34 +1,15 @@
-//! Error returned by the core `Tracker`.
-//!
-//! Error | Context | Description
-//! ---|---|---
-//! `PeerKeyNotValid` | Authentication | The supplied key is not valid. It may not be registered or expired.
-//! `PeerNotAuthenticated` | Authentication | The peer did not provide the authentication key.
-//! `TorrentNotWhitelisted` | Authorization | The action cannot be perform on a not-whitelisted torrent (it only applies for trackers running in `listed` or `private_listed` modes).
-//!
+//! Errors returned by the core tracker.
 use std::panic::Location;
 
-use bittorrent_http_protocol::v1::responses;
 use bittorrent_primitives::info_hash::InfoHash;
 use torrust_tracker_located_error::LocatedError;
 
 use super::authentication::key::ParseKeyError;
 use super::databases;
 
-/// Authentication or authorization error returned by the core `Tracker`
+/// Whitelist errors returned by the core tracker.
 #[derive(thiserror::Error, Debug, Clone)]
-pub enum Error {
-    // Authentication errors
-    #[error("The supplied key: {key:?}, is not valid: {source}")]
-    PeerKeyNotValid {
-        key: super::authentication::Key,
-        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
-    },
-
-    #[error("The peer is not authenticated, {location}")]
-    PeerNotAuthenticated { location: &'static Location<'static> },
-
-    // Authorization errors
+pub enum WhitelistError {
     #[error("The torrent: {info_hash}, is not whitelisted, {location}")]
     TorrentNotWhitelisted {
         info_hash: InfoHash,
@@ -36,7 +17,7 @@ pub enum Error {
     },
 }
 
-/// Errors related to peers keys.
+/// Peers keys errors returned by the core tracker.
 #[allow(clippy::module_name_repetitions)]
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum PeerKeyError {
@@ -55,10 +36,85 @@ pub enum PeerKeyError {
     },
 }
 
-impl From<Error> for responses::error::Error {
-    fn from(err: Error) -> Self {
-        responses::error::Error {
-            failure_reason: format!("Tracker error: {err}"),
+#[cfg(test)]
+mod tests {
+
+    mod whitelist_error {
+
+        use crate::error::WhitelistError;
+        use crate::test_helpers::tests::sample_info_hash;
+
+        #[test]
+        fn torrent_not_whitelisted() {
+            let err = WhitelistError::TorrentNotWhitelisted {
+                info_hash: sample_info_hash(),
+                location: std::panic::Location::caller(),
+            };
+
+            let err_msg = format!("{err}");
+
+            assert!(
+                err_msg.contains(&format!("The torrent: {}, is not whitelisted", sample_info_hash())),
+                "Error message did not contain expected text: {err_msg}"
+            );
+        }
+    }
+
+    mod peer_key_error {
+        use torrust_tracker_located_error::Located;
+
+        use crate::databases::driver::Driver;
+        use crate::error::PeerKeyError;
+        use crate::{authentication, databases};
+
+        #[test]
+        fn duration_overflow() {
+            let seconds_valid = 100;
+
+            let err = PeerKeyError::DurationOverflow { seconds_valid };
+
+            let err_msg = format!("{err}");
+
+            assert!(
+                err_msg.contains(&format!("Invalid peer key duration: {seconds_valid}")),
+                "Error message did not contain expected text: {err_msg}"
+            );
+        }
+
+        #[test]
+        fn parsing_from_string() {
+            let err = authentication::key::ParseKeyError::InvalidKeyLength;
+
+            let err = PeerKeyError::InvalidKey {
+                key: "INVALID KEY".to_string(),
+                source: Located(err).into(),
+            };
+
+            let err_msg = format!("{err}");
+
+            assert!(
+                err_msg.contains(&"Invalid key: INVALID KEY".to_string()),
+                "Error message did not contain expected text: {err_msg}"
+            );
+        }
+
+        #[test]
+        fn persisting_into_database() {
+            let err = databases::error::Error::InsertFailed {
+                location: std::panic::Location::caller(),
+                driver: Driver::Sqlite3,
+            };
+
+            let err = PeerKeyError::DatabaseError {
+                source: Located(err).into(),
+            };
+
+            let err_msg = format!("{err}");
+
+            assert!(
+                err_msg.contains(&"Can't persist key".to_string()),
+                "Error message did not contain expected text: {err}"
+            );
         }
     }
 }

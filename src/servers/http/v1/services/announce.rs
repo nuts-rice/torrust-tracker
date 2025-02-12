@@ -153,7 +153,6 @@ mod tests {
         use std::sync::Arc;
 
         use bittorrent_tracker_core::announce_handler::{AnnounceHandler, PeersWanted};
-        use bittorrent_tracker_core::core_tests::sample_info_hash;
         use bittorrent_tracker_core::databases::setup::initialize_database;
         use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
         use bittorrent_tracker_core::torrent::repository::persisted::DatabasePersistentTorrentRepository;
@@ -165,6 +164,7 @@ mod tests {
 
         use super::{sample_peer_using_ipv4, sample_peer_using_ipv6};
         use crate::packages::http_tracker_core;
+        use crate::servers::http::test_helpers::tests::sample_info_hash;
         use crate::servers::http::v1::services::announce::invoke;
         use crate::servers::http::v1::services::announce::tests::{
             initialize_core_tracker_services, sample_peer, MockHttpStatsEventSender,
@@ -195,7 +195,7 @@ mod tests {
                 core_http_tracker_services.http_stats_event_sender.clone(),
                 sample_info_hash(),
                 &mut peer,
-                &PeersWanted::All,
+                &PeersWanted::AsManyAsPossible,
             )
             .await;
 
@@ -232,7 +232,7 @@ mod tests {
                 http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
-                &PeersWanted::All,
+                &PeersWanted::AsManyAsPossible,
             )
             .await;
         }
@@ -277,7 +277,7 @@ mod tests {
                 http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
-                &PeersWanted::All,
+                &PeersWanted::AsManyAsPossible,
             )
             .await;
         }
@@ -303,7 +303,7 @@ mod tests {
                 http_stats_event_sender,
                 sample_info_hash(),
                 &mut peer,
-                &PeersWanted::All,
+                &PeersWanted::AsManyAsPossible,
             )
             .await;
         }

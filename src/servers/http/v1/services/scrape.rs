@@ -84,7 +84,6 @@ mod tests {
     use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
     use bittorrent_primitives::info_hash::InfoHash;
     use bittorrent_tracker_core::announce_handler::AnnounceHandler;
-    use bittorrent_tracker_core::core_tests::sample_info_hash;
     use bittorrent_tracker_core::databases::setup::initialize_database;
     use bittorrent_tracker_core::scrape_handler::ScrapeHandler;
     use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
@@ -98,6 +97,7 @@ mod tests {
     use torrust_tracker_test_helpers::configuration;
 
     use crate::packages::http_tracker_core;
+    use crate::servers::http::test_helpers::tests::sample_info_hash;
 
     fn initialize_announce_and_scrape_handlers_for_public_tracker() -> (Arc<AnnounceHandler>, Arc<ScrapeHandler>) {
         let config = configuration::ephemeral_public();
@@ -162,10 +162,11 @@ mod tests {
         use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 
         use crate::packages::{self, http_tracker_core};
+        use crate::servers::http::test_helpers::tests::sample_info_hash;
         use crate::servers::http::v1::services::scrape::invoke;
         use crate::servers::http::v1::services::scrape::tests::{
-            initialize_announce_and_scrape_handlers_for_public_tracker, initialize_scrape_handler, sample_info_hash,
-            sample_info_hashes, sample_peer, MockHttpStatsEventSender,
+            initialize_announce_and_scrape_handlers_for_public_tracker, initialize_scrape_handler, sample_info_hashes,
+            sample_peer, MockHttpStatsEventSender,
         };
 
         #[tokio::test]
@@ -182,7 +183,7 @@ mod tests {
             // Announce a new peer to force scrape data to contain not zeroed data
             let mut peer = sample_peer();
             let original_peer_ip = peer.ip();
-            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
+            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::AsManyAsPossible);
 
             let scrape_data = invoke(&scrape_handler, &http_stats_event_sender, &info_hashes, &original_peer_ip).await;
 
@@ -247,10 +248,10 @@ mod tests {
         use torrust_tracker_primitives::core::ScrapeData;
 
         use crate::packages::{self, http_tracker_core};
+        use crate::servers::http::test_helpers::tests::sample_info_hash;
         use crate::servers::http::v1::services::scrape::fake;
         use crate::servers::http::v1::services::scrape::tests::{
-            initialize_announce_and_scrape_handlers_for_public_tracker, sample_info_hash, sample_info_hashes, sample_peer,
-            MockHttpStatsEventSender,
+            initialize_announce_and_scrape_handlers_for_public_tracker, sample_info_hashes, sample_peer, MockHttpStatsEventSender,
         };
 
         #[tokio::test]
@@ -267,7 +268,7 @@ mod tests {
             // Announce a new peer to force scrape data to contain not zeroed data
             let mut peer = sample_peer();
             let original_peer_ip = peer.ip();
-            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::All);
+            announce_handler.announce(&info_hash, &mut peer, &original_peer_ip, &PeersWanted::AsManyAsPossible);
 
             let scrape_data = fake(&http_stats_event_sender, &info_hashes, &original_peer_ip).await;
 

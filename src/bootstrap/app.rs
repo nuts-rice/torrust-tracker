@@ -120,6 +120,7 @@ pub fn initialize_app_container(configuration: &Configuration) -> AppContainer {
     ));
     let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
     let db_torrent_repository = Arc::new(DatabasePersistentTorrentRepository::new(&database));
+
     let torrents_manager = Arc::new(TorrentsManager::new(
         &configuration.core,
         &in_memory_torrent_repository,

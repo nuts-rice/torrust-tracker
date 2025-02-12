@@ -55,6 +55,14 @@ impl From<PeerIpResolutionError> for Error {
     }
 }
 
+impl From<bittorrent_tracker_core::error::WhitelistError> for Error {
+    fn from(err: bittorrent_tracker_core::error::WhitelistError) -> Self {
+        Error {
+            failure_reason: format!("Tracker error: {err}"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
