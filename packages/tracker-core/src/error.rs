@@ -1,4 +1,12 @@
-//! Errors returned by the core tracker.
+//! Core tracker errors.
+//!
+//! This module defines the error types used internally by the `BitTorrent`
+//! tracker core.
+//!
+//! These errors encapsulate issues such as whitelisting violations, invalid
+//! peer key data, and database persistence failures. Each error variant
+//! includes contextual information (such as source code location) to facilitate
+//!  debugging.
 use std::panic::Location;
 
 use bittorrent_primitives::info_hash::InfoHash;
@@ -7,9 +15,13 @@ use torrust_tracker_located_error::LocatedError;
 use super::authentication::key::ParseKeyError;
 use super::databases;
 
-/// Whitelist errors returned by the core tracker.
+/// Errors related to torrent whitelisting.
+///
+/// This error is returned when an operation involves a torrent that is not
+/// present in the whitelist.
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum WhitelistError {
+    /// Indicates that the torrent identified by `info_hash` is not whitelisted.
     #[error("The torrent: {info_hash}, is not whitelisted, {location}")]
     TorrentNotWhitelisted {
         info_hash: InfoHash,
@@ -17,19 +29,27 @@ pub enum WhitelistError {
     },
 }
 
-/// Peers keys errors returned by the core tracker.
+/// Errors related to peer key operations.
+///
+/// This error type covers issues encountered during the handling of peer keys,
+/// including validation of key durations, parsing errors, and database
+/// persistence problems.
 #[allow(clippy::module_name_repetitions)]
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum PeerKeyError {
+    /// Returned when the duration specified for the peer key exceeds the
+    /// maximum.
     #[error("Invalid peer key duration: {seconds_valid:?}, is not valid")]
     DurationOverflow { seconds_valid: u64 },
 
+    /// Returned when the provided peer key is invalid.
     #[error("Invalid key: {key}")]
     InvalidKey {
         key: String,
         source: LocatedError<'static, ParseKeyError>,
     },
 
+    /// Returned when persisting the peer key to the database fails.
     #[error("Can't persist key: {source}")]
     DatabaseError {
         source: LocatedError<'static, databases::error::Error>,

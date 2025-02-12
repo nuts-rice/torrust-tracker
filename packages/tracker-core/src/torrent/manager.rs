@@ -1,3 +1,4 @@
+//! Torrents manager.
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,6 +9,18 @@ use super::repository::in_memory::InMemoryTorrentRepository;
 use super::repository::persisted::DatabasePersistentTorrentRepository;
 use crate::{databases, CurrentClock};
 
+/// The `TorrentsManager` is responsible for managing torrent entries by
+/// integrating persistent storage and in-memory state. It provides methods to
+/// load torrent data from the database into memory, and to periodically clean
+/// up stale torrent entries by removing inactive peers or entire torrent
+/// entries that no longer have active peers.
+///
+/// This manager relies on two repositories:
+///
+/// - An **in-memory repository** to provide fast access to the current torrent
+///   state.
+/// - A **persistent repository** that stores aggregate torrent metrics (e.g.,
+///   seeders count) across tracker restarts.
 pub struct TorrentsManager {
     /// The tracker configuration.
     config: Core,
@@ -21,6 +34,19 @@ pub struct TorrentsManager {
 }
 
 impl TorrentsManager {
+    /// Creates a new instance of `TorrentsManager`.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - A reference to the tracker configuration.
+    /// * `in_memory_torrent_repository` - A shared reference to the in-memory
+    ///   repository of torrents.
+    /// * `db_torrent_repository` - A shared reference to the persistent
+    ///   repository for torrent metrics.
+    ///
+    /// # Returns
+    ///
+    /// A new `TorrentsManager` instance with cloned references of the provided dependencies.
     #[must_use]
     pub fn new(
         config: &Core,
@@ -34,13 +60,16 @@ impl TorrentsManager {
         }
     }
 
-    /// It loads the torrents from database into memory. It only loads the
-    /// torrent entry list with the number of seeders for each torrent. Peers
-    /// data is not persisted.
+    /// Loads torrents from the persistent database into the in-memory repository.
+    ///
+    /// This function retrieves the list of persistent torrent entries (which
+    /// include only the aggregate metrics, not the detailed peer lists) from
+    /// the database, and then imports that data into the in-memory repository.
     ///
     /// # Errors
     ///
-    /// Will return a `database::Error` if unable to load the list of `persistent_torrents` from the database.
+    /// Returns a `databases::error::Error` if unable to load the persistent
+    /// torrent data.
     #[allow(dead_code)]
     pub(crate) fn load_torrents_from_database(&self) -> Result<(), databases::error::Error> {
         let persistent_torrents = self.db_torrent_repository.load_all()?;
@@ -50,7 +79,18 @@ impl TorrentsManager {
         Ok(())
     }
 
-    /// Remove inactive peers and (optionally) peerless torrents.
+    /// Cleans up torrent entries by removing inactive peers and, optionally,
+    /// torrents with no active peers.
+    ///
+    /// This function performs two cleanup tasks:
+    ///
+    /// 1. It removes peers from torrent entries that have not been updated
+    ///    within a cutoff time. The cutoff time is calculated as the current
+    ///    time minus the maximum allowed peer timeout, as specified in the
+    ///    tracker policy.
+    /// 2. If the tracker is configured to remove peerless torrents
+    ///    (`remove_peerless_torrents` is set), it removes entire torrent
+    ///    entries that have no active peers.
     pub fn cleanup_torrents(&self) {
         let current_cutoff = CurrentClock::now_sub(&Duration::from_secs(u64::from(self.config.tracker_policy.max_peer_timeout)))
             .unwrap_or_default();

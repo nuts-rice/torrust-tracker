@@ -1,3 +1,7 @@
+//! Whitelist manager.
+//!
+//! This module provides the `WhitelistManager` struct, which is responsible for
+//! managing the whitelist of torrents.
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
@@ -5,8 +9,11 @@ use bittorrent_primitives::info_hash::InfoHash;
 use super::repository::in_memory::InMemoryWhitelist;
 use super::repository::persisted::DatabaseWhitelist;
 use crate::databases;
-
-/// It handles the list of allowed torrents. Only for listed trackers.
+/// Manages the whitelist of allowed torrents.
+///
+/// This structure handles both the in-memory and persistent representations of
+/// the whitelist. It is primarily relevant for private trackers that restrict
+/// access to specific torrents.
 pub struct WhitelistManager {
     /// The in-memory list of allowed torrents.
     in_memory_whitelist: Arc<InMemoryWhitelist>,
@@ -16,6 +23,17 @@ pub struct WhitelistManager {
 }
 
 impl WhitelistManager {
+    /// Creates a new `WhitelistManager` instance.
+    ///
+    /// # Arguments
+    ///
+    /// - `database_whitelist`: Persistent database-backed whitelist repository.
+    /// - `in_memory_whitelist`: In-memory whitelist repository for fast runtime
+    ///   access.
+    ///
+    /// # Returns
+    ///
+    /// A new `WhitelistManager` instance.
     #[must_use]
     pub fn new(database_whitelist: Arc<DatabaseWhitelist>, in_memory_whitelist: Arc<InMemoryWhitelist>) -> Self {
         Self {
@@ -24,35 +42,39 @@ impl WhitelistManager {
         }
     }
 
-    /// It adds a torrent to the whitelist.
-    /// Adding torrents is not relevant to public trackers.
+    /// Adds a torrent to the whitelist.
+    ///
+    /// This operation is relevant for private trackers to control which
+    /// torrents are allowed.
     ///
     /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to add the `info_hash` into the whitelist database.
+    /// Returns a `database::Error` if the operation fails in the database.
     pub async fn add_torrent_to_whitelist(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
         self.database_whitelist.add(info_hash)?;
         self.in_memory_whitelist.add(info_hash).await;
         Ok(())
     }
 
-    /// It removes a torrent from the whitelist.
-    /// Removing torrents is not relevant to public trackers.
+    /// Removes a torrent from the whitelist.
+    ///
+    /// This operation is relevant for private trackers to revoke access to
+    /// specific torrents.
     ///
     /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to remove the `info_hash` from the whitelist database.
+    /// Returns a `database::Error` if the operation fails in the database.
     pub async fn remove_torrent_from_whitelist(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
         self.database_whitelist.remove(info_hash)?;
         self.in_memory_whitelist.remove(info_hash).await;
         Ok(())
     }
 
-    /// It loads the whitelist from the database.
+    /// Loads the whitelist from the database into memory.
+    ///
+    /// This is useful when restarting the tracker to ensure the in-memory
+    /// whitelist is synchronized with the database.
     ///
     /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to load the list whitelisted `info_hash`s from the database.
+    /// Returns a `database::Error` if the operation fails to load from the database.
     pub async fn load_whitelist_from_database(&self) -> Result<(), databases::error::Error> {
         let whitelisted_torrents_from_database = self.database_whitelist.load_from_database()?;
 

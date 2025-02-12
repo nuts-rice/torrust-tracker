@@ -1,3 +1,64 @@
+//! Scrape handler.
+//!
+//! The `scrape` request allows clients to query metadata about the swarm in bulk.
+//!
+//! An `scrape` request includes a list of infohashes whose swarm metadata you
+//! want to collect.
+//!
+//! ## Scrape Response Format
+//!
+//! The returned struct is:
+//!
+//! ```rust,no_run
+//! use bittorrent_primitives::info_hash::InfoHash;
+//! use std::collections::HashMap;
+//!
+//! pub struct ScrapeData {
+//!     pub files: HashMap<InfoHash, SwarmMetadata>,
+//! }
+//!
+//! pub struct SwarmMetadata {
+//!     pub complete: u32,   // The number of active peers that have completed downloading (seeders)
+//!     pub downloaded: u32, // The number of peers that have ever completed downloading
+//!     pub incomplete: u32, // The number of active peers that have not completed downloading (leechers)
+//! }
+//! ```
+//!
+//! ## Example JSON Response
+//!
+//! The JSON representation of a sample `scrape` response would be like the following:
+//!
+//! ```json
+//! {
+//!     'files': {
+//!       'xxxxxxxxxxxxxxxxxxxx': {'complete': 11, 'downloaded': 13772, 'incomplete': 19},
+//!       'yyyyyyyyyyyyyyyyyyyy': {'complete': 21, 'downloaded': 206, 'incomplete': 20}
+//!     }
+//! }
+//! ```
+//!  
+//! `xxxxxxxxxxxxxxxxxxxx` and `yyyyyyyyyyyyyyyyyyyy` are 20-byte infohash arrays.
+//! There are two data structures for infohashes: byte arrays and hex strings:
+//!
+//! ```rust,no_run
+//! use bittorrent_primitives::info_hash::InfoHash;
+//! use std::str::FromStr;
+//!
+//! let info_hash: InfoHash = [255u8; 20].into();
+//!
+//! assert_eq!(
+//!     info_hash,
+//!     InfoHash::from_str("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").unwrap()
+//! );
+//! ```
+//!
+//! ## References:
+//!
+//! Refer to `BitTorrent` BEPs and other sites for more information about the `scrape` request:
+//!
+//! - [BEP 48. Tracker Protocol Extension: Scrape](https://www.bittorrent.org/beps/bep_0048.html)
+//! - [BEP 15. UDP Tracker Protocol for `BitTorrent`. Scrape section](https://www.bittorrent.org/beps/bep_0015.html)
+//! - [Vuze docs](https://wiki.vuze.com/w/Scrape)
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
@@ -7,8 +68,9 @@ use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use super::torrent::repository::in_memory::InMemoryTorrentRepository;
 use super::whitelist;
 
+/// Handles scrape requests, providing torrent swarm metadata.
 pub struct ScrapeHandler {
-    /// The service to check is a torrent is whitelisted.
+    /// Service for authorizing access to whitelisted torrents.
     whitelist_authorization: Arc<whitelist::authorization::WhitelistAuthorization>,
 
     /// The in-memory torrents repository.
@@ -16,6 +78,7 @@ pub struct ScrapeHandler {
 }
 
 impl ScrapeHandler {
+    /// Creates a new `ScrapeHandler` instance.
     #[must_use]
     pub fn new(
         whitelist_authorization: &Arc<whitelist::authorization::WhitelistAuthorization>,
@@ -27,9 +90,14 @@ impl ScrapeHandler {
         }
     }
 
-    /// It handles a scrape request.
+    /// Handles a scrape request for multiple torrents.
     ///
-    /// BEP 48: [Tracker Protocol Extension: Scrape](https://www.bittorrent.org/beps/bep_0048.html).
+    /// - Returns metadata for each requested torrent.
+    /// - If a torrent isn't whitelisted or doesn't exist, returns zeroed stats.
+    ///
+    /// # BEP Reference:
+    ///
+    /// [BEP 48: Scrape Protocol](https://www.bittorrent.org/beps/bep_0048.html)
     pub async fn scrape(&self, info_hashes: &Vec<InfoHash>) -> ScrapeData {
         let mut scrape_data = ScrapeData::empty();
 

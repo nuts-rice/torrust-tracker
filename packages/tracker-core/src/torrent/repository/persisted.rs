@@ -1,3 +1,4 @@
+//! The repository that stored persistent torrents' data into the database.
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
@@ -6,17 +7,39 @@ use torrust_tracker_primitives::PersistentTorrents;
 use crate::databases::error::Error;
 use crate::databases::Database;
 
-/// Torrent repository implementation that persists the torrents in a database.
+/// Torrent repository implementation that persists torrent metrics in a database.
 ///
-/// Not all the torrent in-memory data is persisted. For now only some of the
-/// torrent metrics are persisted.
+/// This repository persists only a subset of the torrent data: the torrent
+/// metrics, specifically the number of downloads (or completed counts) for each
+/// torrent. It relies on a database driver (either `SQLite3` or `MySQL`) that
+/// implements the [`Database`] trait to perform the actual persistence
+/// operations.
+///
+/// # Note
+///
+/// Not all in-memory torrent data is persisted; only the aggregate metrics are
+/// stored.
 pub struct DatabasePersistentTorrentRepository {
-    /// A database driver implementation: [`Sqlite3`](crate::core::databases::sqlite)
-    /// or [`MySQL`](crate::core::databases::mysql)
+    /// A shared reference to the database driver implementation.
+    ///
+    /// The driver must implement the [`Database`] trait. This allows for
+    /// different underlying implementations (e.g., `SQLite3` or `MySQL`) to be
+    /// used interchangeably.
     database: Arc<Box<dyn Database>>,
 }
 
 impl DatabasePersistentTorrentRepository {
+    /// Creates a new instance of `DatabasePersistentTorrentRepository`.
+    ///
+    /// # Arguments
+    ///
+    /// * `database` - A shared reference to a boxed database driver
+    ///   implementing the [`Database`] trait.
+    ///
+    /// # Returns
+    ///
+    /// A new `DatabasePersistentTorrentRepository` instance with a cloned
+    /// reference to the provided database.
     #[must_use]
     pub fn new(database: &Arc<Box<dyn Database>>) -> DatabasePersistentTorrentRepository {
         Self {
@@ -24,20 +47,31 @@ impl DatabasePersistentTorrentRepository {
         }
     }
 
-    /// It loads the persistent torrents from the database.
+    /// Loads all persistent torrent metrics from the database.
+    ///
+    /// This function retrieves the torrent metrics (e.g., download counts) from the persistent store
+    /// and returns them as a [`PersistentTorrents`] map.
     ///
     /// # Errors
     ///
-    /// Will return a database `Err` if unable to load.
+    /// Returns an [`Error`] if the underlying database query fails.
     pub(crate) fn load_all(&self) -> Result<PersistentTorrents, Error> {
         self.database.load_persistent_torrents()
     }
 
-    /// It saves the persistent torrent into the database.
+    /// Saves the persistent torrent metric into the database.
+    ///
+    /// This function stores or updates the download count for the torrent
+    /// identified by the provided infohash.
+    ///
+    /// # Arguments
+    ///
+    /// * `info_hash` - The info hash of the torrent.
+    /// * `downloaded` - The number of times the torrent has been downloaded.
     ///
     /// # Errors
     ///
-    /// Will return a database `Err` if unable to save.
+    /// Returns an [`Error`] if the database operation fails.
     pub(crate) fn save(&self, info_hash: &InfoHash, downloaded: u32) -> Result<(), Error> {
         self.database.save_persistent_torrent(info_hash, downloaded)
     }
