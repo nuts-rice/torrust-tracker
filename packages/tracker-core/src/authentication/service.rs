@@ -1,3 +1,4 @@
+//! Authentication service.
 use std::panic::Location;
 use std::sync::Arc;
 
@@ -6,6 +7,11 @@ use torrust_tracker_configuration::Core;
 use super::key::repository::in_memory::InMemoryKeyRepository;
 use super::{key, Error, Key};
 
+/// The authentication service responsible for validating peer keys.
+///
+/// The service uses an in-memory key repository along with the tracker
+/// configuration to determine whether a given peer key is valid. In a private
+/// tracker, only registered keys (and optionally unexpired keys) are allowed.
 #[derive(Debug)]
 pub struct AuthenticationService {
     /// The tracker configuration.
@@ -16,6 +22,18 @@ pub struct AuthenticationService {
 }
 
 impl AuthenticationService {
+    /// Creates a new instance of the `AuthenticationService`.
+    ///
+    /// # Parameters
+    ///
+    /// - `config`: A reference to the tracker core configuration.
+    /// - `in_memory_key_repository`: A shared reference to an in-memory key
+    ///   repository.
+    ///
+    /// # Returns
+    ///
+    /// An `AuthenticationService` instance initialized with the given
+    /// configuration and repository.
     #[must_use]
     pub fn new(config: &Core, in_memory_key_repository: &Arc<InMemoryKeyRepository>) -> Self {
         Self {
@@ -24,12 +42,23 @@ impl AuthenticationService {
         }
     }
 
-    /// It authenticates the peer `key` against the `Tracker` authentication
-    /// key list.
+    /// Authenticates a peer key against the tracker's authentication key list.
+    ///
+    /// For private trackers, the key must be registered (and optionally not
+    /// expired) to be considered valid. For public trackers, authentication
+    /// always succeeds.
+    ///
+    /// # Parameters
+    ///
+    /// - `key`: A reference to the peer key that needs to be authenticated.
     ///
     /// # Errors
     ///
-    /// Will return an error if the the authentication key cannot be verified.
+    /// Returns an error if:
+    ///
+    /// - The tracker is in private mode and the key cannot be found in the
+    ///   repository.
+    /// - The key is found but fails the expiration check (if expiration is enforced).
     pub async fn authenticate(&self, key: &Key) -> Result<(), Error> {
         if self.tracker_is_private() {
             self.verify_auth_key(key).await
@@ -44,11 +73,25 @@ impl AuthenticationService {
         self.config.private
     }
 
-    /// It verifies an authentication key.
+    /// Verifies the authentication key against the in-memory repository.
+    ///
+    /// This function retrieves the key from the repository. If the key is not
+    /// found, it returns an error with the caller's location. If the key is
+    /// found, the function then checks the key's expiration based on the
+    /// tracker configuration. The behavior differs depending on whether a
+    /// `private` configuration is provided and whether key expiration checking
+    /// is enabled.
+    ///
+    /// # Parameters
+    ///
+    /// - `key`: A reference to the peer key that needs to be verified.
     ///
     /// # Errors
     ///
-    /// Will return a `key::Error` if unable to get any `auth_key`.
+    /// Returns an error if:
+    ///
+    /// - The key is not found in the repository.
+    /// - The key fails the expiration check when such verification is required.
     async fn verify_auth_key(&self, key: &Key) -> Result<(), Error> {
         match self.in_memory_key_repository.get(key).await {
             None => Err(Error::UnableToReadKey {

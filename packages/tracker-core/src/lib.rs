@@ -1,316 +1,57 @@
-//! The core `tracker` module contains the generic `BitTorrent` tracker logic which is independent of the delivery layer.
+//! The core `bittorrent-tracker-core` crate contains the generic `BitTorrent`
+//! tracker logic which is independent of the delivery layer.
 //!
-//! It contains the tracker services and their dependencies. It's a domain layer which does not
-//! specify how the end user should connect to the `Tracker`.
+//! It contains the tracker services and their dependencies. It's a domain layer
+//!  which does not specify how the end user should connect to the `Tracker`.
 //!
-//! Typically this module is intended to be used by higher modules like:
+//! Typically this crate is intended to be used by higher components like:
 //!
 //! - A UDP tracker
 //! - A HTTP tracker
 //! - A tracker REST API
 //!
 //! ```text
-//! Delivery layer     Domain layer
-//!
-//!     HTTP tracker |
-//!      UDP tracker |> Core tracker
-//! Tracker REST API |
+//!   Delivery layer  |   Domain layer
+//! -----------------------------------
+//!     HTTP tracker  |
+//!      UDP tracker  |-> Core tracker
+//! Tracker REST API  |
 //! ```
 //!
 //! # Table of contents
 //!
-//! - [Tracker](#tracker)
-//!   - [Announce request](#announce-request)
-//!   - [Scrape request](#scrape-request)
-//!   - [Torrents](#torrents)
-//!   - [Peers](#peers)
+//! - [Introduction](#introduction)
 //! - [Configuration](#configuration)
-//! - [Services](#services)
+//! - [Announce handler](#announce-handler)
+//! - [Scrape handler](#scrape-handler)
 //! - [Authentication](#authentication)
-//! - [Statistics](#statistics)
-//! - [Persistence](#persistence)
+//! - [Databases](#databases)
+//! - [Torrent](#torrent)
+//! - [Whitelist](#whitelist)
 //!
-//! # Tracker
+//! # Introduction
 //!
-//! The `Tracker` is the main struct in this module. `The` tracker has some groups of responsibilities:
+//! The main purpose of this crate is to provide a generic `BitTorrent` tracker.
 //!
-//! - **Core tracker**: it handles the information about torrents and peers.
-//! - **Authentication**: it handles authentication keys which are used by HTTP trackers.
-//! - **Authorization**: it handles the permission to perform requests.
-//! - **Whitelist**: when the tracker runs in `listed` or `private_listed` mode all operations are restricted to whitelisted torrents.
-//! - **Statistics**: it keeps and serves the tracker statistics.
+//! It has two main responsibilities:
 //!
-//! Refer to [torrust-tracker-configuration](https://docs.rs/torrust-tracker-configuration) crate docs to get more information about the tracker settings.
+//! - To handle **announce** requests.
+//! - To handle **scrape** requests.
 //!
-//! ## Announce request
+//! The crate has also other features:
 //!
-//! Handling `announce` requests is the most important task for a `BitTorrent` tracker.
+//! - **Authentication**: It handles authentication keys which are used by HTTP trackers.
+//! - **Persistence**: It handles persistence of data into a database.
+//! - **Torrent**: It handles the torrent data.
+//! - **Whitelist**: When the tracker runs in [`listed`](https://docs.rs/torrust-tracker-configuration/latest/torrust_tracker_configuration/type.Core.html) mode
+//!   all operations are restricted to whitelisted torrents.
 //!
-//! A `BitTorrent` swarm is a network of peers that are all trying to download the same torrent.
-//! When a peer wants to find other peers it announces itself to the swarm via the tracker.
-//! The peer sends its data to the tracker so that the tracker can add it to the swarm.
-//! The tracker responds to the peer with the list of other peers in the swarm so that
-//! the peer can contact them to start downloading pieces of the file from them.
-//!
-//! Once you have instantiated the `AnnounceHandler` you can `announce` a new [`peer::Peer`](torrust_tracker_primitives::peer::Peer) with:
-//!
-//! ```rust,no_run
-//! use std::net::SocketAddr;
-//! use std::net::IpAddr;
-//! use std::net::Ipv4Addr;
-//! use std::str::FromStr;
-//!
-//! use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
-//! use torrust_tracker_primitives::DurationSinceUnixEpoch;
-//! use torrust_tracker_primitives::peer;
-//! use bittorrent_primitives::info_hash::InfoHash;
-//!
-//! let info_hash = InfoHash::from_str("3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0").unwrap();
-//!
-//! let peer = peer::Peer {
-//!     peer_id: PeerId(*b"-qB00000000000000001"),
-//!     peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8081),
-//!     updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
-//!     uploaded: NumberOfBytes::new(0),
-//!     downloaded: NumberOfBytes::new(0),
-//!     left: NumberOfBytes::new(0),
-//!     event: AnnounceEvent::Completed,
-//! };
-//!
-//! let peer_ip = IpAddr::V4(Ipv4Addr::from_str("126.0.0.1").unwrap());
-//! ```
-//!
-//! ```text
-//! let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip).await;
-//! ```
-//!
-//! The `Tracker` returns the list of peers for the torrent with the infohash `3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0`,
-//! filtering out the peer that is making the `announce` request.
-//!
-//! > **NOTICE**: that the peer argument is mutable because the `Tracker` can change the peer IP if the peer is using a loopback IP.
-//!
-//! The `peer_ip` argument is the resolved peer ip. It's a common practice that trackers ignore the peer ip in the `announce` request params,
-//! and resolve the peer ip using the IP of the client making the request. As the tracker is a domain service, the peer IP must be provided
-//! for the `Tracker` user, which is usually a higher component with access the the request metadata, for example, connection data, proxy headers,
-//! etcetera.
-//!
-//! The returned struct is:
-//!
-//! ```rust,no_run
-//! use torrust_tracker_primitives::peer;
-//! use torrust_tracker_configuration::AnnouncePolicy;
-//!
-//! pub struct AnnounceData {
-//!     pub peers: Vec<peer::Peer>,
-//!     pub swarm_stats: SwarmMetadata,
-//!     pub policy: AnnouncePolicy, // the tracker announce policy.
-//! }
-//!
-//! pub struct SwarmMetadata {
-//!     pub completed: u32, // The number of peers that have ever completed downloading
-//!     pub seeders: u32,   // The number of active peers that have completed downloading (seeders)
-//!     pub leechers: u32,  // The number of active peers that have not completed downloading (leechers)
-//! }
-//!
-//! // Core tracker configuration
-//! pub struct AnnounceInterval {
-//!     // ...
-//!     pub interval: u32, // Interval in seconds that the client should wait between sending regular announce requests to the tracker
-//!     pub interval_min: u32, // Minimum announce interval. Clients must not reannounce more frequently than this
-//!     // ...
-//! }
-//! ```
-//!
-//! Refer to `BitTorrent` BEPs and other sites for more information about the `announce` request:
-//!
-//! - [BEP 3. The `BitTorrent` Protocol Specification](https://www.bittorrent.org/beps/bep_0003.html)
-//! - [BEP 23. Tracker Returns Compact Peer Lists](https://www.bittorrent.org/beps/bep_0023.html)
-//! - [Vuze docs](https://wiki.vuze.com/w/Announce)
-//!
-//! ## Scrape request
-//!
-//! The `scrape` request allows clients to query metadata about the swarm in bulk.
-//!
-//! An `scrape` request includes a list of infohashes whose swarm metadata you want to collect.
-//!
-//! The returned struct is:
-//!
-//! ```rust,no_run
-//! use bittorrent_primitives::info_hash::InfoHash;
-//! use std::collections::HashMap;
-//!
-//! pub struct ScrapeData {
-//!     pub files: HashMap<InfoHash, SwarmMetadata>,
-//! }
-//!
-//! pub struct SwarmMetadata {
-//!     pub complete: u32,   // The number of active peers that have completed downloading (seeders)
-//!     pub downloaded: u32, // The number of peers that have ever completed downloading
-//!     pub incomplete: u32, // The number of active peers that have not completed downloading (leechers)
-//! }
-//! ```
-//!
-//! The JSON representation of a sample `scrape` response would be like the following:
-//!
-//! ```json
-//! {
-//!     'files': {
-//!       'xxxxxxxxxxxxxxxxxxxx': {'complete': 11, 'downloaded': 13772, 'incomplete': 19},
-//!       'yyyyyyyyyyyyyyyyyyyy': {'complete': 21, 'downloaded': 206, 'incomplete': 20}
-//!     }
-//! }
-//! ```
-//!  
-//! `xxxxxxxxxxxxxxxxxxxx` and `yyyyyyyyyyyyyyyyyyyy` are 20-byte infohash arrays.
-//! There are two data structures for infohashes: byte arrays and hex strings:
-//!
-//! ```rust,no_run
-//! use bittorrent_primitives::info_hash::InfoHash;
-//! use std::str::FromStr;
-//!
-//! let info_hash: InfoHash = [255u8; 20].into();
-//!
-//! assert_eq!(
-//!     info_hash,
-//!     InfoHash::from_str("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").unwrap()
-//! );
-//! ```
-//! Refer to `BitTorrent` BEPs and other sites for more information about the `scrape` request:
-//!
-//! - [BEP 48. Tracker Protocol Extension: Scrape](https://www.bittorrent.org/beps/bep_0048.html)
-//! - [BEP 15. UDP Tracker Protocol for `BitTorrent`. Scrape section](https://www.bittorrent.org/beps/bep_0015.html)
-//! - [Vuze docs](https://wiki.vuze.com/w/Scrape)
-//!
-//! ## Torrents
-//!
-//! The [`torrent`] module contains all the data structures stored by the `Tracker` except for peers.
-//!
-//! We can represent the data stored in memory internally by the `Tracker` with this JSON object:
-//!
-//! ```json
-//! {
-//!     "c1277613db1d28709b034a017ab2cae4be07ae10": {
-//!         "completed": 0,
-//!         "peers": {
-//!             "-qB00000000000000001": {
-//!                 "peer_id": "-qB00000000000000001",
-//!                 "peer_addr": "2.137.87.41:1754",
-//!                 "updated": 1672419840,
-//!                 "uploaded": 120,
-//!                 "downloaded": 60,
-//!                 "left": 60,
-//!                 "event": "started"
-//!             },
-//!             "-qB00000000000000002": {
-//!                 "peer_id": "-qB00000000000000002",
-//!                 "peer_addr": "23.17.287.141:2345",
-//!                 "updated": 1679415984,
-//!                 "uploaded": 80,
-//!                 "downloaded": 20,
-//!                 "left": 40,
-//!                 "event": "started"
-//!             }
-//!         }
-//!     }
-//! }
-//! ```
-//!
-//! The `Tracker` maintains an indexed-by-info-hash list of torrents. For each torrent, it stores a torrent `Entry`.
-//! The torrent entry has two attributes:
-//!
-//! - `completed`: which is hte number of peers that have completed downloading the torrent file/s. As they have completed downloading,
-//!   they have a full version of the torrent data, and they can provide the full data to other peers. That's why they are also known as "seeders".
-//! - `peers`: an indexed and orderer list of peer for the torrent. Each peer contains the data received from the peer in the `announce` request.
-//!
-//! The [`torrent`] module not only contains the original data obtained from peer via `announce` requests, it also contains
-//! aggregate data that can be derived from the original data. For example:
-//!
-//! ```rust,no_run
-//! pub struct SwarmMetadata {
-//!     pub complete: u32,   // The number of active peers that have completed downloading (seeders)
-//!     pub downloaded: u32, // The number of peers that have ever completed downloading
-//!     pub incomplete: u32, // The number of active peers that have not completed downloading (leechers)
-//! }
-//!
-//! ```
-//!
-//! > **NOTICE**: that `complete` or `completed` peers are the peers that have completed downloading, but only the active ones are considered "seeders".
-//!
-//! `SwarmMetadata` struct follows name conventions for `scrape` responses. See [BEP 48](https://www.bittorrent.org/beps/bep_0048.html), while `SwarmMetadata`
-//! is used for the rest of cases.
-//!
-//! Refer to [`torrent`] module for more details about these data structures.
-//!
-//! ## Peers
-//!
-//! A `Peer` is the struct used by the `Tracker` to keep peers data:
-//!
-//! ```rust,no_run
-//! use std::net::SocketAddr;
-
-//! use aquatic_udp_protocol::PeerId;
-//! use torrust_tracker_primitives::DurationSinceUnixEpoch;
-//! use aquatic_udp_protocol::NumberOfBytes;
-//! use aquatic_udp_protocol::AnnounceEvent;
-//!
-//! pub struct Peer {
-//!     pub peer_id: PeerId,                     // The peer ID
-//!     pub peer_addr: SocketAddr,           // Peer socket address
-//!     pub updated: DurationSinceUnixEpoch, // Last time (timestamp) when the peer was updated
-//!     pub uploaded: NumberOfBytes,         // Number of bytes the peer has uploaded so far
-//!     pub downloaded: NumberOfBytes,       // Number of bytes the peer has downloaded so far   
-//!     pub left: NumberOfBytes,             // The number of bytes this peer still has to download
-//!     pub event: AnnounceEvent,            // The event the peer has announced: `started`, `completed`, `stopped`
-//! }
-//! ```
-//!
-//! Notice that most of the attributes are obtained from the `announce` request.
-//! For example, an HTTP announce request would contain the following `GET` parameters:
-//!
-//! <http://0.0.0.0:7070/announce?info_hash=%81%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00&peer_addr=2.137.87.41&downloaded=0&uploaded=0&peer_id=-qB00000000000000001&port=17548&left=0&event=completed&compact=0>
-//!
-//! The `Tracker` keeps an in-memory ordered data structure with all the torrents and a list of peers for each torrent, together with some swarm metrics.
-//!
-//! We can represent the data stored in memory with this JSON object:
-//!
-//! ```json
-//! {
-//!     "c1277613db1d28709b034a017ab2cae4be07ae10": {
-//!         "completed": 0,
-//!         "peers": {
-//!             "-qB00000000000000001": {
-//!                 "peer_id": "-qB00000000000000001",
-//!                 "peer_addr": "2.137.87.41:1754",
-//!                 "updated": 1672419840,
-//!                 "uploaded": 120,
-//!                 "downloaded": 60,
-//!                 "left": 60,
-//!                 "event": "started"
-//!             },
-//!             "-qB00000000000000002": {
-//!                 "peer_id": "-qB00000000000000002",
-//!                 "peer_addr": "23.17.287.141:2345",
-//!                 "updated": 1679415984,
-//!                 "uploaded": 80,
-//!                 "downloaded": 20,
-//!                 "left": 40,
-//!                 "event": "started"
-//!             }
-//!         }
-//!     }
-//! }
-//! ```
-//!
-//! That JSON object does not exist, it's only a representation of the `Tracker` torrents data.
-//!
-//! `c1277613db1d28709b034a017ab2cae4be07ae10` is the torrent infohash and `completed` contains the number of peers
-//! that have a full version of the torrent data, also known as seeders.
-//!
-//! Refer to [`peer`](torrust_tracker_primitives::peer) for more information about peers.
+//! Refer to [torrust-tracker-configuration](https://docs.rs/torrust-tracker-configuration)
+//! crate docs to get more information about the tracker settings.
 //!
 //! # Configuration
 //!
-//! You can control the behavior of this module with the module settings:
+//! You can control the behavior of this crate with the `Core` settings:
 //!
 //! ```toml
 //! [logging]
@@ -342,47 +83,41 @@
 //!
 //! Refer to the [`configuration` module documentation](https://docs.rs/torrust-tracker-configuration) to get more information about all options.
 //!
-//! # Services
+//! # Announce handler
 //!
-//! Services are domain services on top of the core tracker domain. Right now there are two types of service:
+//! The `AnnounceHandler` is responsible for handling announce requests.
 //!
-//! - For statistics: [`crate::packages::statistics::services`]
-//! - For torrents: [`crate::core::torrent::services`]
+//! Please refer to the [`announce_handler`] documentation.
 //!
-//! Services usually format the data inside the tracker to make it easier to consume by other parts.
-//! They also decouple the internal data structure, used by the tracker, from the way we deliver that data to the consumers.
-//! The internal data structure is designed for performance or low memory consumption. And it should be changed
-//! without affecting the external consumers.
+//! # Scrape handler
 //!
-//! Services can include extra features like pagination, for example.
+//! The `ScrapeHandler` is responsible for handling scrape requests.
+//!
+//! Please refer to the [`scrape_handler`] documentation.
 //!
 //! # Authentication
 //!
-//! One of the core `Tracker` responsibilities is to create and keep authentication keys. Auth keys are used by HTTP trackers
-//! when the tracker is running in `private` or `private_listed` mode.
+//! The `Authentication` module is responsible for handling authentication keys which are used by HTTP trackers.
 //!
-//! HTTP tracker's clients need to obtain an auth key before starting requesting the tracker. Once the get one they have to include
-//! a `PATH` param with the key in all the HTTP requests. For example, when a peer wants to `announce` itself it has to use the
-//! HTTP tracker endpoint `GET /announce/:key`.
+//! Please refer to the [`authentication`] documentation.
 //!
-//! The common way to obtain the keys is by using the tracker API directly or via other applications like the [Torrust Index](https://github.com/torrust/torrust-index).
+//! # Databases
 //!
-//! To learn more about tracker authentication, refer to the following modules :
+//! The `Databases` module is responsible for handling persistence of data into a database.
 //!
-//! - [`authentication`] module.
+//! Please refer to the [`databases`] documentation.
 //!
-//! # Persistence
+//! # Torrent
 //!
-//! Right now the `Tracker` is responsible for storing and load data into and
-//! from the database, when persistence is enabled.
+//! The `Torrent` module is responsible for handling the torrent data.
 //!
-//! There are three types of persistent object:
+//! Please refer to the [`torrent`] documentation.
 //!
-//! - Authentication keys (only expiring keys)
-//! - Torrent whitelist
-//! - Torrent metrics
+//! # Whitelist
 //!
-//! Refer to [`databases`] module for more information about persistence.
+//! The `Whitelist` module is responsible for handling the whitelist.
+//!
+//! Please refer to the [`whitelist`] documentation.
 pub mod announce_handler;
 pub mod authentication;
 pub mod databases;

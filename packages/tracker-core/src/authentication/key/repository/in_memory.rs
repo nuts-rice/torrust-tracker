@@ -1,6 +1,11 @@
+//! In-memory implementation of the authentication key repository.
 use crate::authentication::key::{Key, PeerKey};
 
-/// In-memory implementation of the authentication key repository.
+/// An in-memory repository for storing authentication keys.
+///
+/// This repository maintains a mapping between a peer's [`Key`] and its
+/// corresponding [`PeerKey`]. It is designed for use in private tracker
+/// environments where keys are maintained in memory.
 #[derive(Debug, Default)]
 pub struct InMemoryKeyRepository {
     /// Tracker users' keys. Only for private trackers.
@@ -8,28 +13,66 @@ pub struct InMemoryKeyRepository {
 }
 
 impl InMemoryKeyRepository {
-    /// It adds a new authentication key.
+    /// Inserts a new authentication key into the repository.
+    ///
+    /// This function acquires a write lock on the internal storage and inserts
+    /// the provided [`PeerKey`], using its inner [`Key`] as the map key.
+    ///
+    /// # Arguments
+    ///
+    /// * `auth_key` - A reference to the [`PeerKey`] to be inserted.
     pub(crate) async fn insert(&self, auth_key: &PeerKey) {
         self.keys.write().await.insert(auth_key.key.clone(), auth_key.clone());
     }
 
-    /// It removes an authentication key.
+    /// Removes an authentication key from the repository.
+    ///
+    /// This function acquires a write lock on the internal storage and removes
+    /// the key that matches the provided [`Key`].
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - A reference to the [`Key`] corresponding to the key to be removed.
     pub(crate) async fn remove(&self, key: &Key) {
         self.keys.write().await.remove(key);
     }
 
+    /// Retrieves an authentication key from the repository.
+    ///
+    /// This function acquires a read lock on the internal storage and returns a
+    ///  cloned [`PeerKey`] if the provided [`Key`] exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - A reference to the [`Key`] to look up.
+    ///
+    /// # Returns
+    ///
+    /// An `Option<PeerKey>` containing the matching key if found, or `None`
+    /// otherwise.
     pub(crate) async fn get(&self, key: &Key) -> Option<PeerKey> {
         self.keys.read().await.get(key).cloned()
     }
 
-    /// It clears all the authentication keys.
+    /// Clears all authentication keys from the repository.
+    ///
+    /// This function acquires a write lock on the internal storage and removes
+    /// all entries.
     #[allow(dead_code)]
     pub(crate) async fn clear(&self) {
         let mut keys = self.keys.write().await;
         keys.clear();
     }
 
-    /// It resets the authentication keys with a new list of keys.
+    /// Resets the repository with a new list of authentication keys.
+    ///
+    /// This function clears all existing keys and then inserts each key from
+    /// the provided vector.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_keys` - A vector of [`PeerKey`] instances that will replace the
+    ///   current set of keys.
     pub async fn reset_with(&self, peer_keys: Vec<PeerKey>) {
         let mut keys_lock = self.keys.write().await;
 

@@ -1,4 +1,10 @@
 //! The `SQLite3` database driver.
+//!
+//! This module provides an implementation of the [`Database`] trait for
+//! `SQLite3` using the `r2d2_sqlite` connection pool. It defines the schema for
+//!  whitelist, torrent metrics, and authentication keys, and provides methods
+//! to create and drop tables as well as perform CRUD operations on these
+//! persistent objects.
 use std::panic::Location;
 use std::str::FromStr;
 
@@ -14,18 +20,29 @@ use crate::authentication::{self, Key};
 
 const DRIVER: Driver = Driver::Sqlite3;
 
+/// `SQLite` driver implementation.
+///
+/// This struct encapsulates a connection pool for `SQLite` using the `r2d2_sqlite`
+/// connection manager.
 pub(crate) struct Sqlite {
     pool: Pool<SqliteConnectionManager>,
 }
 
 impl Sqlite {
-    /// It instantiates a new `SQLite3` database driver.
+    /// Instantiates a new `SQLite3` database driver.
     ///
-    /// Refer to [`databases::Database::new`](crate::core::databases::Database::new).
+    /// This function creates a connection manager for the `SQLite` database
+    /// located at `db_path` and then builds a connection pool using `r2d2`. If
+    /// the pool cannot be created, an error is returned (wrapped with the
+    /// appropriate driver information).
+    ///
+    /// # Arguments
+    ///
+    /// * `db_path` - A string slice representing the file path to the `SQLite` database.
     ///
     /// # Errors
     ///
-    /// Will return `r2d2::Error` if `db_path` is not able to create `SqLite` database.
+    /// Returns an [`Error`] if the connection pool cannot be built.
     pub fn new(db_path: &str) -> Result<Self, Error> {
         let manager = SqliteConnectionManager::file(db_path);
         let pool = r2d2::Pool::builder().build(manager).map_err(|e| (e, DRIVER))?;

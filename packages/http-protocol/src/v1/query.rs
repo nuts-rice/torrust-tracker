@@ -250,6 +250,13 @@ mod tests {
         }
 
         #[test]
+        fn should_ignore_duplicate_param_values_when_asked_to_return_only_one_value() {
+            let query = Query::from(vec![("param1", "value1"), ("param1", "value2")]);
+
+            assert_eq!(query.get_param("param1"), Some("value1".to_string()));
+        }
+
+        #[test]
         fn should_fail_parsing_an_invalid_query_string() {
             let invalid_raw_query = "name=value=value";
 

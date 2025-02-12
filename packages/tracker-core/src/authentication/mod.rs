@@ -1,3 +1,18 @@
+//! Tracker authentication services and structs.
+//!
+//! One of the crate responsibilities is to create and keep authentication keys.
+//! Auth keys are used by HTTP trackers when the tracker is running in `private`
+//!  mode.
+//!
+//! HTTP tracker's clients need to obtain an authentication key before starting
+//! requesting the tracker. Once they get one they have to include a `PATH`
+//! param with the key in all the HTTP requests. For example, when a peer wants
+//! to `announce` itself it has to use the HTTP tracker endpoint:
+//!
+//! `GET /announce/:key`
+//!
+//! The common way to obtain the keys is by using the tracker API directly or
+//! via other applications like the [Torrust Index](https://github.com/torrust/torrust-index).
 use crate::CurrentClock;
 
 pub mod handler;

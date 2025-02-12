@@ -1,3 +1,95 @@
+//! Announce handler.
+//!
+//! Handling `announce` requests is the most important task for a `BitTorrent`
+//! tracker.
+//!
+//! A `BitTorrent` swarm is a network of peers that are all trying to download
+//! the same torrent. When a peer wants to find other peers it announces itself
+//! to the swarm via the tracker. The peer sends its data to the tracker so that
+//! the tracker can add it to the swarm. The tracker responds to the peer with
+//! the list of other peers in the swarm so that the peer can contact them to
+//! start downloading pieces of the file from them.
+//!
+//! Once you have instantiated the `AnnounceHandler` you can `announce` a new [`peer::Peer`](torrust_tracker_primitives) with:
+//!
+//! ```rust,no_run
+//! use std::net::SocketAddr;
+//! use std::net::IpAddr;
+//! use std::net::Ipv4Addr;
+//! use std::str::FromStr;
+//!
+//! use aquatic_udp_protocol::{AnnounceEvent, NumberOfBytes, PeerId};
+//! use torrust_tracker_primitives::DurationSinceUnixEpoch;
+//! use torrust_tracker_primitives::peer;
+//! use bittorrent_primitives::info_hash::InfoHash;
+//!
+//! let info_hash = InfoHash::from_str("3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0").unwrap();
+//!
+//! let peer = peer::Peer {
+//!     peer_id: PeerId(*b"-qB00000000000000001"),
+//!     peer_addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(126, 0, 0, 1)), 8081),
+//!     updated: DurationSinceUnixEpoch::new(1_669_397_478_934, 0),
+//!     uploaded: NumberOfBytes::new(0),
+//!     downloaded: NumberOfBytes::new(0),
+//!     left: NumberOfBytes::new(0),
+//!     event: AnnounceEvent::Completed,
+//! };
+//!
+//! let peer_ip = IpAddr::V4(Ipv4Addr::from_str("126.0.0.1").unwrap());
+//! ```
+//!
+//! ```text
+//! let announce_data = announce_handler.announce(&info_hash, &mut peer, &peer_ip).await;
+//! ```
+//!
+//! The handler returns the list of peers for the torrent with the infohash
+//! `3b245504cf5f11bbdbe1201cea6a6bf45aee1bc0`, filtering out the peer that is
+//! making the `announce` request.
+//!
+//! > **NOTICE**: that the peer argument is mutable because the handler can
+//! > change the peer IP if the peer is using a loopback IP.
+//!
+//! The `peer_ip` argument is the resolved peer ip. It's a common practice that
+//! trackers ignore the peer ip in the `announce` request params, and resolve
+//! the peer ip using the IP of the client making the request. As the tracker is
+//! a domain service, the peer IP must be provided for the handler user, which
+//! is usually a higher component with access the the request metadata, for
+//! example, connection data, proxy headers, etcetera.
+//!
+//! The returned struct is:
+//!
+//! ```rust,no_run
+//! use torrust_tracker_primitives::peer;
+//! use torrust_tracker_configuration::AnnouncePolicy;
+//!
+//! pub struct AnnounceData {
+//!     pub peers: Vec<peer::Peer>,
+//!     pub swarm_stats: SwarmMetadata,
+//!     pub policy: AnnouncePolicy, // the tracker announce policy.
+//! }
+//!
+//! pub struct SwarmMetadata {
+//!     pub completed: u32, // The number of peers that have ever completed downloading
+//!     pub seeders: u32,   // The number of active peers that have completed downloading (seeders)
+//!     pub leechers: u32,  // The number of active peers that have not completed downloading (leechers)
+//! }
+//!
+//! // Core tracker configuration
+//! pub struct AnnounceInterval {
+//!     // ...
+//!     pub interval: u32, // Interval in seconds that the client should wait between sending regular announce requests to the tracker
+//!     pub interval_min: u32, // Minimum announce interval. Clients must not reannounce more frequently than this
+//!     // ...
+//! }
+//! ```
+//!
+//! ## Related BEPs:
+//!
+//! Refer to `BitTorrent` BEPs and other sites for more information about the `announce` request:
+//!
+//! - [BEP 3. The `BitTorrent` Protocol Specification](https://www.bittorrent.org/beps/bep_0003.html)
+//! - [BEP 23. Tracker Returns Compact Peer Lists](https://www.bittorrent.org/beps/bep_0023.html)
+//! - [Vuze docs](https://wiki.vuze.com/w/Announce)
 use std::net::IpAddr;
 use std::sync::Arc;
 
@@ -10,18 +102,20 @@ use torrust_tracker_primitives::swarm_metadata::SwarmMetadata;
 use super::torrent::repository::in_memory::InMemoryTorrentRepository;
 use super::torrent::repository::persisted::DatabasePersistentTorrentRepository;
 
+/// Handles `announce` requests from `BitTorrent` clients.
 pub struct AnnounceHandler {
     /// The tracker configuration.
     config: Core,
 
-    /// The in-memory torrents repository.
+    /// Repository for in-memory torrent data.
     in_memory_torrent_repository: Arc<InMemoryTorrentRepository>,
 
-    /// The persistent torrents repository.
+    /// Repository for persistent torrent data (database).
     db_torrent_repository: Arc<DatabasePersistentTorrentRepository>,
 }
 
 impl AnnounceHandler {
+    /// Creates a new `AnnounceHandler`.
     #[must_use]
     pub fn new(
         config: &Core,
@@ -35,9 +129,20 @@ impl AnnounceHandler {
         }
     }
 
-    /// It handles an announce request.
+    /// Processes an announce request from a peer.
     ///
     /// BEP 03: [The `BitTorrent` Protocol Specification](https://www.bittorrent.org/beps/bep_0003.html).
+    ///
+    /// # Parameters
+    ///
+    /// - `info_hash`: The unique identifier of the torrent.
+    /// - `peer`: The peer announcing itself (may be updated if IP is adjusted).
+    /// - `remote_client_ip`: The IP address of the client making the request.
+    /// - `peers_wanted`: Specifies how many peers the client wants in the response.
+    ///
+    /// # Returns
+    ///
+    /// An `AnnounceData` struct containing the list of peers, swarm statistics, and tracker policy.
     pub fn announce(
         &self,
         info_hash: &InfoHash,
@@ -77,9 +182,8 @@ impl AnnounceHandler {
         }
     }
 
-    /// It updates the torrent entry in memory, it also stores in the database
-    /// the torrent info data which is persistent, and finally return the data
-    /// needed for a `announce` request response.
+    /// Updates the torrent data in memory, persists statistics if needed, and
+    /// returns the updated swarm stats.
     #[must_use]
     fn upsert_peer_and_get_stats(&self, info_hash: &InfoHash, peer: &peer::Peer) -> SwarmMetadata {
         let swarm_metadata_before = self.in_memory_torrent_repository.get_swarm_metadata(info_hash);
@@ -95,7 +199,7 @@ impl AnnounceHandler {
         swarm_metadata_after
     }
 
-    /// It stores the torrents stats into the database (if persistency is enabled).
+    /// Persists torrent statistics to the database if persistence is enabled.
     fn persist_stats(&self, info_hash: &InfoHash, swarm_metadata: &SwarmMetadata) {
         if self.config.tracker_policy.persistent_torrent_completed_stat {
             let completed = swarm_metadata.downloaded;
@@ -106,22 +210,25 @@ impl AnnounceHandler {
     }
 }
 
-/// How many peers the peer announcing wants in the announce response.
+/// Specifies how many peers a client wants in the announce response.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub enum PeersWanted {
-    /// The peer wants as many peers as possible in the announce response.
+    /// Request as many peers as possible (default behavior).
     #[default]
     AsManyAsPossible,
-    /// The peer only wants a certain amount of peers in the announce response.
+
+    /// Request a specific number of peers.
     Only { amount: usize },
 }
 
 impl PeersWanted {
+    /// Request a specific number of peers.
     #[must_use]
     pub fn only(limit: u32) -> Self {
         limit.into()
     }
 
+    /// Returns the maximum number of peers allowed based on the request and tracker limit.
     fn limit(&self) -> usize {
         match self {
             PeersWanted::AsManyAsPossible => TORRENT_PEERS_LIMIT,
@@ -159,6 +266,10 @@ impl From<u32> for PeersWanted {
     }
 }
 
+/// Assigns the correct IP address to a peer based on tracker settings.
+///
+/// If the client IP is a loopback address and the tracker has an external IP
+/// configured, the external IP will be assigned to the peer.
 #[must_use]
 fn assign_ip_address_to_peer(remote_client_ip: &IpAddr, tracker_external_ip: Option<IpAddr>) -> IpAddr {
     if let Some(host_ip) = tracker_external_ip.filter(|_| remote_client_ip.is_loopback()) {

@@ -1,3 +1,4 @@
+//! Whitelist authorization.
 use std::panic::Location;
 use std::sync::Arc;
 
@@ -8,6 +9,10 @@ use tracing::instrument;
 use super::repository::in_memory::InMemoryWhitelist;
 use crate::error::WhitelistError;
 
+/// Manages the authorization of torrents based on the whitelist.
+///
+/// Used to determine whether a given torrent (`infohash`) is allowed
+/// to be announced or scraped from the tracker.
 pub struct WhitelistAuthorization {
     /// Core tracker configuration.
     config: Core,
@@ -17,7 +22,14 @@ pub struct WhitelistAuthorization {
 }
 
 impl WhitelistAuthorization {
-    /// Creates a new authorization instance.
+    /// Creates a new `WhitelistAuthorization` instance.
+    ///
+    /// # Arguments
+    /// - `config`: Tracker configuration.
+    /// - `in_memory_whitelist`: The in-memory whitelist instance.
+    ///
+    /// # Returns
+    /// A new `WhitelistAuthorization` instance.
     pub fn new(config: &Core, in_memory_whitelist: &Arc<InMemoryWhitelist>) -> Self {
         Self {
             config: config.clone(),
@@ -25,12 +37,15 @@ impl WhitelistAuthorization {
         }
     }
 
-    /// It returns true if the torrent is authorized.
+    /// Checks whether a torrent is authorized.
+    ///
+    /// - If the tracker is **public**, all torrents are authorized.
+    /// - If the tracker is **private** (listed mode), only whitelisted torrents
+    ///   are authorized.
     ///
     /// # Errors
-    ///
-    /// Will return an error if the tracker is running in `listed` mode
-    /// and the infohash is not whitelisted.
+    /// Returns `WhitelistError::TorrentNotWhitelisted` if the tracker is in `listed` mode
+    /// and the `info_hash` is not in the whitelist.
     #[instrument(skip(self, info_hash), err)]
     pub async fn authorize(&self, info_hash: &InfoHash) -> Result<(), WhitelistError> {
         if !self.is_listed() {
@@ -47,12 +62,12 @@ impl WhitelistAuthorization {
         })
     }
 
-    /// Returns `true` is the tracker is in listed mode.
+    /// Checks if the tracker is running in "listed" mode.
     fn is_listed(&self) -> bool {
         self.config.listed
     }
 
-    /// It checks if a torrent is whitelisted.
+    /// Checks if a torrent is present in the whitelist.
     async fn is_info_hash_whitelisted(&self, info_hash: &InfoHash) -> bool {
         self.in_memory_whitelist.contains(info_hash).await
     }

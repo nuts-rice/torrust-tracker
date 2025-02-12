@@ -1,41 +1,44 @@
-//! Tracker authentication services and structs.
+//! Tracker authentication services and types.
 //!
-//! This module contains functions to handle tracker keys.
-//! Tracker keys are tokens used to authenticate the tracker clients when the tracker runs
-//! in `private` or `private_listed` modes.
+//! This module provides functions and data structures for handling tracker keys.
+//! Tracker keys are tokens used to authenticate tracker clients when the
+//! tracker is running in `private` mode.
 //!
-//! There are services to [`generate_key`]  and [`verify_key_expiration`]  authentication keys.
+//! Authentication keys are used exclusively by HTTP trackers. Every key has an
+//! expiration time, meaning that it is only valid for a predetermined period.
+//! Once the expiration time is reached, an expiring key will be rejected.
 //!
-//! Authentication keys are used only by [`HTTP`](crate::servers::http) trackers. All keys have an expiration time, that means
-//! they are only valid during a period of time. After that time the expiring key will no longer be valid.
+//! The primary key structure is [`PeerKey`], which couples a randomly generated
+//!  [`Key`] (a 32-character alphanumeric string) with an optional expiration
+//! timestamp.
 //!
-//! Keys are stored in this struct:
+//! # Examples
 //!
-//! ```rust,no_run
-//! use bittorrent_tracker_core::authentication::Key;
-//! use torrust_tracker_primitives::DurationSinceUnixEpoch;
+//! Generating a new key valid for `9999` seconds:
 //!
-//! pub struct PeerKey {
-//!     /// Random 32-char string. For example: `YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ`
-//!     pub key: Key,
-//!
-//!     /// Timestamp, the key will be no longer valid after this timestamp.
-//!     /// If `None` the keys will not expire (permanent key).
-//!     pub valid_until: Option<DurationSinceUnixEpoch>,
-//! }
-//! ```
-//!
-//! You can generate a new key valid for `9999` seconds and `0` nanoseconds from the current time with the following:
-//!
-//! ```rust,no_run
+//! ```rust
 //! use bittorrent_tracker_core::authentication;
 //! use std::time::Duration;
 //!
 //! let expiring_key = authentication::key::generate_key(Some(Duration::new(9999, 0)));
 //!
-//! // And you can later verify it with:
-//!
+//! // Later, verify that the key is still valid.
 //! assert!(authentication::key::verify_key_expiration(&expiring_key).is_ok());
+//! ```
+//!
+//! The core key types are defined as follows:
+//!
+//! ```rust
+//! use bittorrent_tracker_core::authentication::Key;
+//! use torrust_tracker_primitives::DurationSinceUnixEpoch;
+//!
+//! pub struct PeerKey {
+//!     /// A random 32-character authentication token (e.g., `YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ`)
+//!     pub key: Key,
+//!
+//!     /// The timestamp after which the key expires. If `None`, the key is permanent.
+//!     pub valid_until: Option<DurationSinceUnixEpoch>,
+//! }
 //! ```
 pub mod peer_key;
 pub mod repository;
@@ -75,17 +78,33 @@ pub(crate) fn generate_expiring_key(lifetime: Duration) -> PeerKey {
     generate_key(Some(lifetime))
 }
 
-/// It generates a new random 32-char authentication [`PeerKey`].
+/// Generates a new random 32-character authentication key (`PeerKey`).
 ///
-/// It can be an expiring or permanent key.
+/// If a lifetime is provided, the generated key will expire after the specified
+///  duration; otherwise, the key is permanent (i.e., it never expires).
 ///
 /// # Panics
 ///
-/// It would panic if the `lifetime: Duration` + Duration is more than `Duration::MAX`.
+/// Panics if the addition of the lifetime to the current time overflows
+/// (an extremely unlikely event).
 ///
 /// # Arguments
 ///
-/// * `lifetime`: if `None` the key will be permanent.
+/// * `lifetime`: An optional duration specifying how long the key is valid.
+///   If `None`, the key is permanent.
+///
+/// # Examples
+///
+/// ```rust
+/// use bittorrent_tracker_core::authentication::key;
+/// use std::time::Duration;
+///
+/// // Generate an expiring key valid for 3600 seconds.
+/// let expiring_key = key::generate_key(Some(Duration::from_secs(3600)));
+///
+/// // Generate a permanent key.
+/// let permanent_key = key::generate_key(None);
+/// ```
 #[must_use]
 pub fn generate_key(lifetime: Option<Duration>) -> PeerKey {
     let random_key = Key::random();
@@ -107,13 +126,27 @@ pub fn generate_key(lifetime: Option<Duration>) -> PeerKey {
     }
 }
 
-/// It verifies an [`PeerKey`]. It checks if the expiration date has passed.
-/// Permanent keys without duration (`None`) do not expire.
+/// Verifies whether a given authentication key (`PeerKey`) is still valid.
+///
+/// For expiring keys, this function compares the key's expiration timestamp
+/// against the current time. Permanent keys (with `None` as their expiration)
+/// are always valid.
 ///
 /// # Errors
 ///
-/// Will return a verification error [`crate::authentication::key::Error`] if
-/// it cannot verify the key.
+/// Returns a verification error of type [`enum@Error`] if the key has expired.
+///
+/// # Examples
+///
+/// ```rust
+/// use bittorrent_tracker_core::authentication::key;
+/// use std::time::Duration;
+///
+/// let expiring_key = key::generate_key(Some(Duration::from_secs(100)));
+///
+/// // If the key's expiration time has passed, the verification will fail.
+/// assert!(key::verify_key_expiration(&expiring_key).is_ok());
+/// ```
 pub fn verify_key_expiration(auth_key: &PeerKey) -> Result<(), Error> {
     let current_time: DurationSinceUnixEpoch = CurrentClock::now();
 
@@ -136,17 +169,20 @@ pub fn verify_key_expiration(auth_key: &PeerKey) -> Result<(), Error> {
 #[derive(Debug, Error)]
 #[allow(dead_code)]
 pub enum Error {
+    /// Wraps an underlying error encountered during key verification.
     #[error("Key could not be verified: {source}")]
     KeyVerificationError {
         source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
     },
 
+    /// Indicates that the key could not be read or found.
     #[error("Failed to read key: {key}, {location}")]
     UnableToReadKey {
         location: &'static Location<'static>,
         key: Box<Key>,
     },
 
+    /// Indicates that the key has expired.
     #[error("Key has expired, {location}")]
     KeyExpired { location: &'static Location<'static> },
 }
