@@ -6,7 +6,7 @@
 //!
 //! There are services to [`generate_key`]  and [`verify_key_expiration`]  authentication keys.
 //!
-//! Authentication keys are used only by [`HTTP`](crate::servers::http) trackers. All keys have an expiration time, that means
+//! Authentication keys are used only by HTTP trackers. All keys have an expiration time, that means
 //! they are only valid during a period of time. After that time the expiring key will no longer be valid.
 //!
 //! Keys are stored in this struct:
@@ -112,7 +112,7 @@ pub fn generate_key(lifetime: Option<Duration>) -> PeerKey {
 ///
 /// # Errors
 ///
-/// Will return a verification error [`crate::authentication::key::Error`] if
+/// Will return a verification error [`enum@crate::authentication::key::Error`] if
 /// it cannot verify the key.
 pub fn verify_key_expiration(auth_key: &PeerKey) -> Result<(), Error> {
     let current_time: DurationSinceUnixEpoch = CurrentClock::now();

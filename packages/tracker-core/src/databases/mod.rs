@@ -4,8 +4,8 @@
 //!
 //! There are two implementations of the trait (two drivers):
 //!
-//! - [`Mysql`](crate::core::databases::mysql::Mysql)
-//! - [`Sqlite`](crate::core::databases::sqlite::Sqlite)
+//! - `Mysql`
+//! - `Sqlite`
 //!
 //! > **NOTICE**: There are no database migrations. If there are any changes,
 //! > we will implemented them or provide a script to migrate to the new schema.

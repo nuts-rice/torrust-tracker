@@ -25,7 +25,6 @@
 //!   - [Torrents](#torrents)
 //!   - [Peers](#peers)
 //! - [Configuration](#configuration)
-//! - [Services](#services)
 //! - [Authentication](#authentication)
 //! - [Statistics](#statistics)
 //! - [Persistence](#persistence)
@@ -341,18 +340,6 @@
 //! ```
 //!
 //! Refer to the [`configuration` module documentation](https://docs.rs/torrust-tracker-configuration) to get more information about all options.
-//!
-//! # Services
-//!
-//! Services are domain services on top of the core tracker domain. Right now there are two types of service:
-//!
-//! - For statistics: [`crate::packages::statistics::services`]
-//! - For torrents: [`crate::core::torrent::services`]
-//!
-//! Services usually format the data inside the tracker to make it easier to consume by other parts.
-//! They also decouple the internal data structure, used by the tracker, from the way we deliver that data to the consumers.
-//! The internal data structure is designed for performance or low memory consumption. And it should be changed
-//! without affecting the external consumers.
 //!
 //! Services can include extra features like pagination, for example.
 //!
