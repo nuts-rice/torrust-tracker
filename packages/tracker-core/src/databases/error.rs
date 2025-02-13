@@ -1,6 +1,13 @@
 //! Database errors.
 //!
-//! This module contains the [Database errors](crate::core::databases::error::Error).
+//! This module defines the [`Error`] enum used to represent errors that occur
+//! during database operations. These errors encapsulate issues such as missing
+//! query results, malformed queries, connection failures, and connection pool
+//! creation errors. Each error variant includes contextual information such as
+//! the associated database driver and, when applicable, the source error.
+//!
+//! External errors from database libraries (e.g., `rusqlite`, `mysql`) are
+//! converted into this error type using the provided `From` implementations.
 use std::panic::Location;
 use std::sync::Arc;
 
@@ -9,30 +16,43 @@ use torrust_tracker_located_error::{DynError, Located, LocatedError};
 
 use super::driver::Driver;
 
+/// Database error type that encapsulates various failures encountered during
+/// database operations.
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
-    /// The query unexpectedly returned nothing.
+    /// Indicates that a query unexpectedly returned no rows.
+    ///
+    /// This error variant is used when a query that is expected to return a
+    /// result does not.
     #[error("The {driver} query unexpectedly returned nothing: {source}")]
     QueryReturnedNoRows {
         source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
         driver: Driver,
     },
 
-    /// The query was malformed.
+    /// Indicates that the query was malformed.
+    ///
+    /// This error variant is used when the SQL query itself is invalid or
+    /// improperly formatted.
     #[error("The {driver} query was malformed: {source}")]
     InvalidQuery {
         source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
         driver: Driver,
     },
 
-    /// Unable to insert a record into the database
+    /// Indicates a failure to insert a record into the database.
+    ///
+    /// This error is raised when an insertion operation fails.
     #[error("Unable to insert record into {driver} database, {location}")]
     InsertFailed {
         location: &'static Location<'static>,
         driver: Driver,
     },
 
-    /// Unable to delete a record into the database
+    /// Indicates a failure to delete a record from the database.
+    ///
+    /// This error includes an error code that may be returned by the database
+    /// driver.
     #[error("Failed to remove record from {driver} database, error-code: {error_code}, {location}")]
     DeleteFailed {
         location: &'static Location<'static>,
@@ -40,14 +60,18 @@ pub enum Error {
         driver: Driver,
     },
 
-    /// Unable to connect to the database
+    /// Indicates a failure to connect to the database.
+    ///
+    /// This error variant wraps connection-related errors, such as those caused by an invalid URL.
     #[error("Failed to connect to {driver} database: {source}")]
     ConnectionError {
         source: LocatedError<'static, UrlError>,
         driver: Driver,
     },
 
-    /// Unable to create a connection pool
+    /// Indicates a failure to create a connection pool.
+    ///
+    /// This error variant is used when the connection pool creation (using r2d2) fails.
     #[error("Failed to create r2d2 {driver} connection pool: {source}")]
     ConnectionPool {
         source: LocatedError<'static, r2d2::Error>,

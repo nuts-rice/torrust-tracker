@@ -1,29 +1,42 @@
+//! The in-memory list of allowed torrents.
 use bittorrent_primitives::info_hash::InfoHash;
 
-/// The in-memory list of allowed torrents.
+/// In-memory whitelist to manage allowed torrents.
+///
+/// Stores `InfoHash` values for quick lookup and modification.
 #[derive(Debug, Default)]
 pub struct InMemoryWhitelist {
-    /// The list of allowed torrents.
+    /// A thread-safe set of whitelisted `InfoHash` values.
     whitelist: tokio::sync::RwLock<std::collections::HashSet<InfoHash>>,
 }
 
 impl InMemoryWhitelist {
-    /// It adds a torrent from the whitelist in memory.
+    /// Adds a torrent to the in-memory whitelist.
+    ///
+    /// # Returns
+    ///
+    /// - `true` if the torrent was newly added.
+    /// - `false` if the torrent was already in the whitelist.
     pub async fn add(&self, info_hash: &InfoHash) -> bool {
         self.whitelist.write().await.insert(*info_hash)
     }
 
-    /// It removes a torrent from the whitelist in memory.
+    /// Removes a torrent from the in-memory whitelist.
+    ///
+    /// # Returns
+    ///
+    /// - `true` if the torrent was present and removed.
+    /// - `false` if the torrent was not found.
     pub(crate) async fn remove(&self, info_hash: &InfoHash) -> bool {
         self.whitelist.write().await.remove(info_hash)
     }
 
-    /// It checks if it contains an info-hash.
+    /// Checks if a torrent is in the whitelist.
     pub async fn contains(&self, info_hash: &InfoHash) -> bool {
         self.whitelist.read().await.contains(info_hash)
     }
 
-    /// It clears the whitelist.
+    /// Clears all torrents from the whitelist.
     pub(crate) async fn clear(&self) {
         let mut whitelist = self.whitelist.write().await;
         whitelist.clear();

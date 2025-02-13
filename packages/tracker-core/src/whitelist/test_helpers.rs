@@ -1,5 +1,8 @@
-//! Some generic test helpers functions.
-
+//! Generic test helper functions for the whitelist module.
+//!
+//! This module provides utility functions to initialize the whitelist services required for testing.
+//! In particular, it sets up the `WhitelistAuthorization` and `WhitelistManager` services using a
+//! configured database and an in-memory whitelist repository.
 #[cfg(test)]
 pub(crate) mod tests {
 

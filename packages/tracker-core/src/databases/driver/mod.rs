@@ -1,7 +1,4 @@
 //! Database driver factory.
-//!
-//! See [`databases::driver::build`](crate::core::databases::driver::build)
-//! function for more information.
 use mysql::Mysql;
 use serde::{Deserialize, Serialize};
 use sqlite::Sqlite;

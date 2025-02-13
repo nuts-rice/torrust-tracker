@@ -1,3 +1,4 @@
+//! The repository that persists the whitelist.
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
@@ -5,6 +6,9 @@ use bittorrent_primitives::info_hash::InfoHash;
 use crate::databases::{self, Database};
 
 /// The persisted list of allowed torrents.
+///
+/// This repository handles adding, removing, and loading torrents
+/// from a persistent database like `SQLite` or `MySQL`ç.
 pub struct DatabaseWhitelist {
     /// A database driver implementation: [`Sqlite3`](crate::core::databases::sqlite)
     /// or [`MySQL`](crate::core::databases::mysql)
@@ -12,16 +16,17 @@ pub struct DatabaseWhitelist {
 }
 
 impl DatabaseWhitelist {
+    /// Creates a new `DatabaseWhitelist`.
     #[must_use]
     pub fn new(database: Arc<Box<dyn Database>>) -> Self {
         Self { database }
     }
 
-    /// It adds a torrent to the whitelist if it has not been whitelisted previously
+    /// Adds a torrent to the whitelist if not already present.
     ///
     /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to add the `info_hash` to the whitelist database.
+    /// Returns a `database::Error` if unable to add the `info_hash` to the
+    /// whitelist.
     pub(crate) fn add(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
         let is_whitelisted = self.database.is_info_hash_whitelisted(*info_hash)?;
 
@@ -34,11 +39,10 @@ impl DatabaseWhitelist {
         Ok(())
     }
 
-    /// It removes a torrent from the whitelist in the database.
+    /// Removes a torrent from the whitelist if it exists.
     ///
     /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to remove the `info_hash` from the whitelist database.
+    /// Returns a `database::Error` if unable to remove the `info_hash`.
     pub(crate) fn remove(&self, info_hash: &InfoHash) -> Result<(), databases::error::Error> {
         let is_whitelisted = self.database.is_info_hash_whitelisted(*info_hash)?;
 
@@ -51,11 +55,11 @@ impl DatabaseWhitelist {
         Ok(())
     }
 
-    /// It loads the whitelist from the database.
+    /// Loads the entire whitelist from the database.
     ///
     /// # Errors
-    ///
-    /// Will return a `database::Error` if unable to load the list whitelisted `info_hash`s from the database.
+    /// Returns a `database::Error` if unable to load whitelisted `info_hash`
+    /// values.
     pub(crate) fn load_from_database(&self) -> Result<Vec<InfoHash>, databases::error::Error> {
         self.database.load_whitelist()
     }

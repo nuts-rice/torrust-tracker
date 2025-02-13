@@ -1,4 +1,10 @@
 //! The `MySQL` database driver.
+//!
+//! This module provides an implementation of the [`Database`] trait for `MySQL`
+//! using the `r2d2_mysql` connection pool. It configures the MySQL connection
+//! based on a URL, creates the necessary tables (for torrent metrics, torrent
+//! whitelist, and authentication keys), and implements all CRUD operations
+//! required by the persistence layer.
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -15,6 +21,11 @@ use crate::authentication::{self, Key};
 
 const DRIVER: Driver = Driver::MySQL;
 
+/// `MySQL` driver implementation.
+///
+/// This struct encapsulates a connection pool for `MySQL`, built using the
+/// `r2d2_mysql` connection manager. It implements the [`Database`] trait to
+/// provide persistence operations.
 pub(crate) struct Mysql {
     pool: Pool<MySqlConnectionManager>,
 }

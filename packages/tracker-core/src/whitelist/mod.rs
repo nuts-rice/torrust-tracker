@@ -1,3 +1,21 @@
+//! This module contains the logic to manage the torrent whitelist.
+//!
+//! In tracker configurations where the tracker operates in "listed" mode, only
+//! torrents that have been explicitly added to the whitelist are allowed to
+//! perform announce and scrape actions. This module provides all the
+//! functionality required to manage such a whitelist.
+//!
+//! The module is organized into the following submodules:
+//!
+//! - **`authorization`**: Contains the logic to authorize torrents based on their
+//!   whitelist status.
+//! - **`manager`**: Provides high-level management functions for the whitelist,
+//!   such as adding or removing torrents.
+//! - **`repository`**: Implements persistence for whitelist data.
+//! - **`setup`**: Provides initialization routines for setting up the whitelist
+//!   system.
+//! - **`test_helpers`**: Contains helper functions and fixtures for testing
+//!   whitelist functionality.
 pub mod authorization;
 pub mod manager;
 pub mod repository;

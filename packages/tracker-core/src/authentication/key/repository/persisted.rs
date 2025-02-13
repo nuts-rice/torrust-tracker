@@ -1,14 +1,28 @@
+//! The database repository for the authentication keys.
 use std::sync::Arc;
 
 use crate::authentication::key::{Key, PeerKey};
 use crate::databases::{self, Database};
 
-/// The database repository for the authentication keys.
+/// A repository for storing authentication keys in a persistent database.
+///
+/// This repository provides methods to add, remove, and load authentication
+/// keys from the underlying database. It wraps an instance of a type
+/// implementing the [`Database`] trait.
 pub struct DatabaseKeyRepository {
     database: Arc<Box<dyn Database>>,
 }
 
 impl DatabaseKeyRepository {
+    /// Creates a new `DatabaseKeyRepository` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `database` - A shared reference to a boxed database implementation.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `DatabaseKeyRepository`
     #[must_use]
     pub fn new(database: &Arc<Box<dyn Database>>) -> Self {
         Self {
@@ -16,31 +30,43 @@ impl DatabaseKeyRepository {
         }
     }
 
-    /// It adds a new key to the database.
+    /// Adds a new authentication key to the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_key` - A reference to the [`PeerKey`] to be persisted.
     ///
     /// # Errors
     ///
-    /// Will return a `databases::error::Error` if unable to add the `auth_key` to the database.
+    /// Returns a [`databases::error::Error`] if the key cannot be added.
     pub(crate) fn add(&self, peer_key: &PeerKey) -> Result<(), databases::error::Error> {
         self.database.add_key_to_keys(peer_key)?;
         Ok(())
     }
 
-    /// It removes an key from the database.
+    /// Removes an authentication key from the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - A reference to the [`Key`] corresponding to the key to remove.
     ///
     /// # Errors
     ///
-    /// Will return a `database::Error` if unable to remove the `key` from the database.
+    /// Returns a [`databases::error::Error`] if the key cannot be removed.
     pub(crate) fn remove(&self, key: &Key) -> Result<(), databases::error::Error> {
         self.database.remove_key_from_keys(key)?;
         Ok(())
     }
 
-    /// It loads all keys from the database.
+    /// Loads all authentication keys from the database.
     ///
     /// # Errors
     ///
-    /// Will return a `database::Error` if unable to load the keys from the database.
+    /// Returns a [`databases::error::Error`] if the keys cannot be loaded.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing all persisted [`PeerKey`] entries.
     pub(crate) fn load_keys(&self) -> Result<Vec<PeerKey>, databases::error::Error> {
         let keys = self.database.load_keys()?;
         Ok(keys)

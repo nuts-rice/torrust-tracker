@@ -1,3 +1,13 @@
+//! Authentication keys for private trackers.
+//!
+//! This module defines the types and functionality for managing authentication
+//! keys used by the tracker. These keys, represented by the `Key` and `PeerKey`
+//!  types, are essential for authenticating peers in private tracker
+//! environments.
+//!
+//! A `Key` is a 32-character alphanumeric token, while a `PeerKey` couples a
+//! `Key` with an optional expiration timestamp. If the expiration is set (via
+//! `valid_until`), the key will become invalid after that time.
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -11,22 +21,42 @@ use torrust_tracker_primitives::DurationSinceUnixEpoch;
 
 use super::AUTH_KEY_LENGTH;
 
-/// An authentication key which can potentially have an expiration time.
-/// After that time is will automatically become invalid.
+/// A peer authentication key with an optional expiration time.
+///
+/// A `PeerKey` associates a generated `Key` (a 32-character alphanumeric string)
+/// with an optional expiration timestamp (`valid_until`). If `valid_until` is
+/// `None`, the key is considered permanent.
+///
+/// # Example
+///
+/// ```rust
+/// use std::time::Duration;
+/// use bittorrent_tracker_core::authentication::key::peer_key::{Key, PeerKey};
+///
+/// let expiring_key = PeerKey {
+///     key: Key::random(),
+///     valid_until: Some(Duration::from_secs(3600)), // Expires in 1 hour
+/// };
+///
+/// let permanent_key = PeerKey {
+///     key: Key::random(),
+///     valid_until: None,
+/// };
+/// ```
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PeerKey {
-    /// Random 32-char string. For example: `YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ`
+    /// A 32-character authentication key. For example: `YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ`
     pub key: Key,
 
-    /// Timestamp, the key will be no longer valid after this timestamp.
-    /// If `None` the keys will not expire (permanent key).
+    /// An optional expiration timestamp. If set, the key becomes invalid after
+    /// this time. A value of `None` indicates a permanent key.
     pub valid_until: Option<DurationSinceUnixEpoch>,
 }
 
 impl PartialEq for PeerKey {
     fn eq(&self, other: &Self) -> bool {
-        // We ignore the fractions of seconds when comparing the timestamps
-        // because we only store the seconds in the database.
+        // When comparing two PeerKeys, ignore fractions of seconds since only
+        // whole seconds are stored in the database.
         self.key == other.key
             && match (&self.valid_until, &other.valid_until) {
                 (Some(a), Some(b)) => a.as_secs() == b.as_secs(),
@@ -53,14 +83,17 @@ impl PeerKey {
         self.key.clone()
     }
 
-    /// It returns the expiry time. For example, for the starting time for Unix Epoch
-    /// (timestamp 0) it will return a `DateTime` whose string representation is
-    /// `1970-01-01 00:00:00 UTC`.
+    /// Computes and returns the expiration time as a UTC `DateTime`, if one
+    /// exists.
+    ///
+    /// The returned time is derived from the stored seconds since the Unix
+    /// epoch. Note that any fractional seconds are discarded since only whole
+    /// seconds are stored in the database.
     ///
     /// # Panics
     ///
-    /// Will panic when the key timestamp overflows the internal i64 type.
-    /// (this will naturally happen in 292.5 billion years)
+    /// Panics if the key's timestamp overflows the internal `i64` type (this is
+    ///  extremely unlikely, happening roughly 292.5 billion years from now).
     #[must_use]
     pub fn expiry_time(&self) -> Option<chrono::DateTime<chrono::Utc>> {
         // We remove the fractions of seconds because we only store the seconds
@@ -72,17 +105,37 @@ impl PeerKey {
 
 /// A token used for authentication.
 ///
-/// - It contains only ascii alphanumeric chars: lower and uppercase letters and
-///   numbers.
-/// - It's a 32-char string.
+/// The `Key` type encapsulates a 32-character string that must consist solely
+/// of ASCII alphanumeric characters (0-9, a-z, A-Z). This key is used by the
+/// tracker to authenticate peers.
+///
+/// # Examples
+///
+/// Creating a key from a valid string:
+///
+/// ```
+/// use bittorrent_tracker_core::authentication::key::peer_key::Key;
+/// let key = Key::new("YZSl4lMZupRuOpSRC3krIKR5BPB14nrJ").unwrap();
+/// ```
+///
+/// Generating a random key:
+///
+/// ```
+/// use bittorrent_tracker_core::authentication::key::peer_key::Key;
+/// let random_key = Key::random();
+/// ```
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Display, Hash)]
 pub struct Key(String);
 
 impl Key {
+    /// Constructs a new `Key` from the given string.
+    ///
     /// # Errors
     ///
-    /// Will return an error is the string represents an invalid key.
-    /// Valid keys can only contain 32 chars including 0-9, a-z and A-Z.
+    /// Returns a `ParseKeyError` if:
+    ///
+    /// - The input string does not have exactly 32 characters.
+    /// - The input string contains characters that are not ASCII alphanumeric.
     pub fn new(value: &str) -> Result<Self, ParseKeyError> {
         if value.len() != AUTH_KEY_LENGTH {
             return Err(ParseKeyError::InvalidKeyLength);
@@ -95,11 +148,14 @@ impl Key {
         Ok(Self(value.to_owned()))
     }
 
-    /// It generates a random key.
+    /// Generates a new random authentication key.
+    ///
+    /// The random key is generated by sampling 32 ASCII alphanumeric characters.
     ///
     /// # Panics
     ///
-    /// Will panic if the random number generator fails to generate a valid key.
+    /// Panics if the random number generator fails to produce a valid key
+    /// (extremely unlikely).
     pub fn random() -> Self {
         let random_id: String = rng()
             .sample_iter(&Alphanumeric)
@@ -115,9 +171,11 @@ impl Key {
     }
 }
 
-/// Error returned when a key cannot be parsed from a string.
+/// Errors that can occur when parsing a string into a `Key`.
 ///
-/// ```text
+/// # Examples
+///
+/// ```rust
 /// use bittorrent_tracker_core::authentication::Key;
 /// use std::str::FromStr;
 ///
@@ -132,9 +190,12 @@ impl Key {
 /// this error.
 #[derive(Debug, Error)]
 pub enum ParseKeyError {
+    /// The provided key does not have exactly 32 characters.
     #[error("Invalid key length. Key must be have 32 chars")]
     InvalidKeyLength,
 
+    /// The provided key contains invalid characters. Only ASCII alphanumeric
+    /// characters are allowed.
     #[error("Invalid chars for key. Key can only alphanumeric chars (0-9, a-z, A-Z)")]
     InvalidChars,
 }

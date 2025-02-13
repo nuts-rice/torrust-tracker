@@ -1,9 +1,17 @@
 //! Core tracker domain services.
 //!
-//! There are two services:
+//! This module defines the primary services for retrieving torrent-related data
+//! from the tracker. There are two main services:
 //!
-//! - [`get_torrent_info`]: it returns all the data about one torrent.
-//! - [`get_torrents`]: it returns data about some torrent in bulk excluding the peer list.
+//! - [`get_torrent_info`]: Returns all available data (including the list of
+//!   peers) about a single torrent.
+//! - [`get_torrents_page`] and [`get_torrents`]: Return summarized data about
+//!   multiple torrents, excluding the peer list.
+//!
+//! The full torrent info is represented by the [`Info`] struct, which includes
+//! swarm data (peer list) and aggregate metrics. The [`BasicInfo`] struct
+//! provides similar data but without the list of peers, making it suitable for
+//! bulk queries.
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
@@ -13,37 +21,74 @@ use torrust_tracker_torrent_repository::entry::EntrySync;
 
 use crate::torrent::repository::in_memory::InMemoryTorrentRepository;
 
-/// It contains all the information the tracker has about a torrent
+/// Full torrent information, including swarm (peer) details.
+///
+/// This struct contains all the information that the tracker holds about a
+/// torrent, including the infohash, aggregate swarm metrics (seeders, leechers,
+/// completed downloads), and the complete list of peers in the swarm.
 #[derive(Debug, PartialEq)]
 pub struct Info {
     /// The infohash of the torrent this data is related to
     pub info_hash: InfoHash,
-    /// The total number of seeders for this torrent. Peer that actively serving a full copy of the torrent data
+
+    /// The total number of seeders for this torrent. Peer that actively serving
+    /// a full copy of the torrent data
     pub seeders: u64,
-    /// The total number of peers that have ever complete downloading this torrent
+
+    /// The total number of peers that have ever complete downloading this
+    /// torrent
     pub completed: u64,
-    /// The total number of leechers for this torrent. Peers that actively downloading this torrent
+
+    /// The total number of leechers for this torrent. Peers that actively
+    /// downloading this torrent
     pub leechers: u64,
-    /// The swarm: the list of peers that are actively trying to download or serving this torrent
+
+    /// The swarm: the list of peers that are actively trying to download or
+    /// serving this torrent
     pub peers: Option<Vec<peer::Peer>>,
 }
 
-/// It contains only part of the information the tracker has about a torrent
+/// Basic torrent information, excluding the list of peers.
 ///
-/// It contains the same data as [Info] but without the list of peers in the swarm.
+/// This struct contains the same aggregate metrics as [`Info`] (infohash,
+/// seeders, completed, leechers) but omits the peer list. It is used when only
+/// summary information is needed.
 #[derive(Debug, PartialEq, Clone)]
 pub struct BasicInfo {
     /// The infohash of the torrent this data is related to
     pub info_hash: InfoHash,
-    /// The total number of seeders for this torrent. Peer that actively serving a full copy of the torrent data
+
+    /// The total number of seeders for this torrent. Peer that actively serving
+    /// a full copy of the torrent data
     pub seeders: u64,
-    /// The total number of peers that have ever complete downloading this torrent
+
+    /// The total number of peers that have ever complete downloading this
+    /// torrent
     pub completed: u64,
-    /// The total number of leechers for this torrent. Peers that actively downloading this torrent
+
+    /// The total number of leechers for this torrent. Peers that actively
+    /// downloading this torrent
     pub leechers: u64,
 }
 
-/// It returns all the information the tracker has about one torrent in a [Info] struct.
+/// Retrieves complete torrent information for a given torrent.
+///
+/// This function queries the in-memory torrent repository for a torrent entry
+/// matching the provided infohash. If found, it extracts the swarm metadata
+/// (aggregate metrics) and the current list of peers, and returns an [`Info`]
+/// struct.
+///
+/// # Arguments
+///
+/// * `in_memory_torrent_repository` - A shared reference to the in-memory
+///   torrent repository.
+/// * `info_hash` - A reference to the torrent's infohash.
+///
+/// # Returns
+///
+/// An [`Option<Info>`] which is:
+/// - `Some(Info)` if the torrent exists in the repository.
+/// - `None` if the torrent is not found.
 #[must_use]
 pub fn get_torrent_info(in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>, info_hash: &InfoHash) -> Option<Info> {
     let torrent_entry_option = in_memory_torrent_repository.get(info_hash);
@@ -65,7 +110,23 @@ pub fn get_torrent_info(in_memory_torrent_repository: &Arc<InMemoryTorrentReposi
     })
 }
 
-/// It returns all the information the tracker has about multiple torrents in a [`BasicInfo`] struct, excluding the peer list.
+/// Retrieves summarized torrent information for a paginated set of torrents.
+///
+/// This function returns a vector of [`BasicInfo`] structures for torrents in
+/// the repository, according to the provided pagination parameters. The
+/// returned data excludes the peer list, providing only aggregate metrics.
+///
+/// # Arguments
+///
+/// * `in_memory_torrent_repository` - A shared reference to the in-memory
+///   torrent repository.
+/// * `pagination` - An optional reference to a [`Pagination`] object specifying
+///   offset and limit.
+///
+/// # Returns
+///
+/// A vector of [`BasicInfo`] structs representing the summarized data of the
+/// torrents.
 #[must_use]
 pub fn get_torrents_page(
     in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>,
@@ -87,7 +148,23 @@ pub fn get_torrents_page(
     basic_infos
 }
 
-/// It returns all the information the tracker has about multiple torrents in a [`BasicInfo`] struct, excluding the peer list.
+/// Retrieves summarized torrent information for a specified list of torrents.
+///
+/// This function iterates over a slice of infohashes, fetches the corresponding
+/// swarm metadata from the in-memory repository (if available), and returns a
+/// vector of [`BasicInfo`] structs. This function is useful for bulk queries
+/// where detailed peer information is not required.
+///
+/// # Arguments
+///
+/// * `in_memory_torrent_repository` - A shared reference to the in-memory
+///   torrent repository.
+/// * `info_hashes` - A slice of infohashes for which to retrieve the torrent
+///   information.
+///
+/// # Returns
+///
+/// A vector of [`BasicInfo`] structs for the requested torrents.
 #[must_use]
 pub fn get_torrents(in_memory_torrent_repository: &Arc<InMemoryTorrentRepository>, info_hashes: &[InfoHash]) -> Vec<BasicInfo> {
     let mut basic_infos: Vec<BasicInfo> = vec![];

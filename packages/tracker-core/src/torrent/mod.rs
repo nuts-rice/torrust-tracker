@@ -1,30 +1,168 @@
-//! Structs to store the swarm data.
+//! Swarm Data Structures.
 //!
-//! There are to main data structures:
+//! This module defines the primary data structures used to store and manage
+//! swarm data within the tracker. In `BitTorrent` terminology, a "swarm" is
+//! the collection of peers that are sharing or downloading a given torrent.
 //!
-//! - A torrent [`Entry`](torrust_tracker_torrent_repository::entry::Entry): it contains all the information stored by the tracker for one torrent.
-//! - The [`SwarmMetadata`](torrust_tracker_primitives::swarm_metadata::SwarmMetadata): it contains aggregate information that can me derived from the torrent entries.
+//! There are two main types of data stored:
 //!
-//! A "swarm" is a network of peers that are trying to download the same torrent.
+//! - **Torrent Entry** (`Entry`): Contains all the information the tracker
+//!   stores for a single torrent, including the list of peers currently in the
+//!   swarm. This data is crucial for peers to locate each other and initiate
+//!   downloads.
 //!
-//! The torrent entry contains the "swarm" data, which is basically the list of peers in the swarm.
-//! That's the most valuable information the peer want to get from the tracker, because it allows them to
-//! start downloading torrent from those peers.
+//! - **Swarm Metadata** (`SwarmMetadata`): Contains aggregate data derived from
+//!   all torrent entries. This metadata is split into:
+//!   - **Active Peers Data:** Metrics related to the peers that are currently
+//!     active in the swarm.
+//!   - **Historical Data:** Metrics collected since the tracker started, such
+//!     as the total number of completed downloads.
 //!
-//! The "swarm metadata" contains aggregate data derived from the torrent entries. There two types of data:
+//! ## Metrics Collected
 //!
-//! - For **active peers**: metrics related to the current active peers in the swarm.
-//! - **Historical data**: since the tracker started running.
+//! The tracker collects and aggregates the following metrics:
 //!
-//! The tracker collects metrics for:
+//! - The total number of peers that have completed downloading the torrent
+//!   since the tracker began collecting metrics.
+//! - The number of completed downloads from peers that remain active (i.e., seeders).
+//! - The number of active peers that have not completed downloading the torrent (i.e., leechers).
 //!
-//! - The number of peers that have completed downloading the torrent since the tracker started collecting metrics.
-//! - The number of peers that have completed downloading the torrent and are still active, that means they are actively participating in the network,
-//!   by announcing themselves periodically to the tracker. Since they have completed downloading they have a full copy of the torrent data. Peers with a
-//!   full copy of the data are called "seeders".
-//! - The number of peers that have NOT completed downloading the torrent and are still active, that means they are actively participating in the network.
-//!   Peer that don not have a full copy of the torrent data are called "leechers".
+//! This information is used both to inform peers about available connections
+//! and to provide overall swarm statistics.
 //!
+//! This module re-exports core types from the torrent repository crate to
+//! simplify integration.
+//!
+//! ## Internal Data Structures
+//!
+//! The [`torrent`](crate::torrent) module contains all the data structures
+//! stored by the tracker except for peers.
+//!
+//! We can represent the data stored in memory internally by the tracker with
+//! this JSON object:
+//!
+//! ```json
+//! {
+//!     "c1277613db1d28709b034a017ab2cae4be07ae10": {
+//!         "completed": 0,
+//!         "peers": {
+//!             "-qB00000000000000001": {
+//!                 "peer_id": "-qB00000000000000001",
+//!                 "peer_addr": "2.137.87.41:1754",
+//!                 "updated": 1672419840,
+//!                 "uploaded": 120,
+//!                 "downloaded": 60,
+//!                 "left": 60,
+//!                 "event": "started"
+//!             },
+//!             "-qB00000000000000002": {
+//!                 "peer_id": "-qB00000000000000002",
+//!                 "peer_addr": "23.17.287.141:2345",
+//!                 "updated": 1679415984,
+//!                 "uploaded": 80,
+//!                 "downloaded": 20,
+//!                 "left": 40,
+//!                 "event": "started"
+//!             }
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! The tracker maintains an indexed-by-info-hash list of torrents. For each
+//! torrent, it stores a torrent `Entry`. The torrent entry has two attributes:
+//!
+//! - `completed`: which is hte number of peers that have completed downloading
+//!   the torrent file/s. As they have completed downloading, they have a full
+//!   version of the torrent data, and they can provide the full data to other
+//!   peers. That's why they are also known as "seeders".
+//! - `peers`: an indexed and orderer list of peer for the torrent. Each peer
+//!   contains the data received from the peer in the `announce` request.
+//!
+//! The [`crate::torrent`] module not only contains the original data obtained
+//! from peer via `announce` requests, it also contains aggregate data that can
+//! be derived from the original data. For example:
+//!
+//! ```rust,no_run
+//! pub struct SwarmMetadata {
+//!     pub complete: u32,   // The number of active peers that have completed downloading (seeders)
+//!     pub downloaded: u32, // The number of peers that have ever completed downloading
+//!     pub incomplete: u32, // The number of active peers that have not completed downloading (leechers)
+//! }
+//! ```
+//!
+//! > **NOTICE**: that `complete` or `completed` peers are the peers that have
+//! > completed downloading, but only the active ones are considered "seeders".
+//!
+//! `SwarmMetadata` struct follows name conventions for `scrape` responses. See
+//! [BEP 48](https://www.bittorrent.org/beps/bep_0048.html), while `SwarmMetadata`
+//! is used for the rest of cases.
+//!
+//! ## Peers
+//!
+//! A `Peer` is the struct used by the tracker to keep peers data:
+//!
+//! ```rust,no_run
+//! use std::net::SocketAddr;
+//! use aquatic_udp_protocol::PeerId;
+//! use torrust_tracker_primitives::DurationSinceUnixEpoch;
+//! use aquatic_udp_protocol::NumberOfBytes;
+//! use aquatic_udp_protocol::AnnounceEvent;
+//!
+//! pub struct Peer {
+//!     pub peer_id: PeerId,                 // The peer ID
+//!     pub peer_addr: SocketAddr,           // Peer socket address
+//!     pub updated: DurationSinceUnixEpoch, // Last time (timestamp) when the peer was updated
+//!     pub uploaded: NumberOfBytes,         // Number of bytes the peer has uploaded so far
+//!     pub downloaded: NumberOfBytes,       // Number of bytes the peer has downloaded so far   
+//!     pub left: NumberOfBytes,             // The number of bytes this peer still has to download
+//!     pub event: AnnounceEvent,            // The event the peer has announced: `started`, `completed`, `stopped`
+//! }
+//! ```
+//!
+//! Notice that most of the attributes are obtained from the `announce` request.
+//! For example, an HTTP announce request would contain the following `GET` parameters:
+//!
+//! <http://0.0.0.0:7070/announce?info_hash=%81%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00%00&peer_addr=2.137.87.41&downloaded=0&uploaded=0&peer_id=-qB00000000000000001&port=17548&left=0&event=completed&compact=0>
+//!
+//! The `Tracker` keeps an in-memory ordered data structure with all the torrents and a list of peers for each torrent, together with some swarm metrics.
+//!
+//! We can represent the data stored in memory with this JSON object:
+//!
+//! ```json
+//! {
+//!     "c1277613db1d28709b034a017ab2cae4be07ae10": {
+//!         "completed": 0,
+//!         "peers": {
+//!             "-qB00000000000000001": {
+//!                 "peer_id": "-qB00000000000000001",
+//!                 "peer_addr": "2.137.87.41:1754",
+//!                 "updated": 1672419840,
+//!                 "uploaded": 120,
+//!                 "downloaded": 60,
+//!                 "left": 60,
+//!                 "event": "started"
+//!             },
+//!             "-qB00000000000000002": {
+//!                 "peer_id": "-qB00000000000000002",
+//!                 "peer_addr": "23.17.287.141:2345",
+//!                 "updated": 1679415984,
+//!                 "uploaded": 80,
+//!                 "downloaded": 20,
+//!                 "left": 40,
+//!                 "event": "started"
+//!             }
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! That JSON object does not exist, it's only a representation of the `Tracker` torrents data.
+//!
+//! `c1277613db1d28709b034a017ab2cae4be07ae10` is the torrent infohash and `completed` contains the number of peers
+//! that have a full version of the torrent data, also known as seeders.
+//!
+//! Refer to [`peer`](torrust_tracker_primitives::peer) for more information about peers.
 pub mod manager;
 pub mod repository;
 pub mod services;
@@ -33,7 +171,11 @@ pub mod services;
 use torrust_tracker_torrent_repository::EntryMutexStd;
 use torrust_tracker_torrent_repository::TorrentsSkipMapMutexStd;
 
-// Currently used types from the torrent repository crate.
+/// Alias for the primary torrent collection type, implemented as a skip map
+/// wrapped in a mutex. This type is used internally by the tracker to manage
+/// and access torrent entries.
 pub(crate) type Torrents = TorrentsSkipMapMutexStd;
+
+/// Alias for a single torrent entry.
 #[cfg(test)]
 pub(crate) type TorrentEntry = EntryMutexStd;
