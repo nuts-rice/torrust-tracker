@@ -127,3 +127,58 @@ impl From<WhitelistError> for UdpScrapeError {
         Self::TrackerCoreWhitelistError { source: whitelist_error }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use aquatic_udp_protocol::{ConnectionId, InfoHash, ScrapeRequest, TransactionId};
+    use bittorrent_tracker_core::torrent::repository::in_memory::InMemoryTorrentRepository;
+    use bittorrent_tracker_core::whitelist;
+    use bittorrent_tracker_core::whitelist::repository::in_memory::InMemoryWhitelist;
+    use torrust_tracker_test_helpers::configuration;
+
+    use super::*;
+    //use crate::connection_cookie::make;
+    use crate::services::tests::{
+        sample_cookie_valid_range,
+        //   sample_ipv4_remote_addr_fingerprint,
+        //   sample_issue_time
+        sample_ipv4_remote_addr,
+    };
+    use crate::statistics::repository::Repository;
+
+    #[tokio::test]
+    async fn should_increase_scrape_event_when_handling_scrape() {
+        let config = configuration::ephemeral_public();
+        let _stats_repository = Repository::new();
+        let in_memory_whitelist = Arc::new(InMemoryWhitelist::default());
+        let whitelist_authorization = Arc::new(whitelist::authorization::WhitelistAuthorization::new(
+            &config.core,
+            &in_memory_whitelist.clone(),
+        ));
+        let in_memory_torrent_repository = Arc::new(InMemoryTorrentRepository::default());
+        let (udp_core_stats_event_sender, _udp_core_stats_repository) = statistics::setup::factory(false);
+        let udp_core_stats_event_sender = Arc::new(udp_core_stats_event_sender);
+        let info_hash = InfoHash([0u8; 20]);
+        let info_hashes = vec![info_hash];
+        let request = ScrapeRequest {
+            connection_id: ConnectionId(0i64.into()),
+            transaction_id: TransactionId(0i32.into()),
+            info_hashes,
+        };
+
+        let scrape_handler = Arc::new(ScrapeHandler::new(&whitelist_authorization, &in_memory_torrent_repository));
+        let scrape_service = ScrapeService::new(scrape_handler, udp_core_stats_event_sender);
+        let _result = scrape_service
+            .handle_scrape(sample_ipv4_remote_addr(), &request, sample_cookie_valid_range())
+            .await;
+        /*let _stats = stats_repository.get_stats().await;
+                    assert_eq!(
+                        response.unwrap().files.keys().next().unwrap().0,
+                        info_hash.0,
+
+                    );
+        */
+        //  );
+        //assert_eq!(stats.udp4_scrapes_handled, 1)
+    }
+}

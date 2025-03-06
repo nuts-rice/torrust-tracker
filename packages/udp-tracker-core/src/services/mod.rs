@@ -7,6 +7,7 @@ pub mod scrape;
 pub(crate) mod tests {
 
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+    use std::ops::Range;
 
     use futures::future::BoxFuture;
     use mockall::mock;
@@ -37,6 +38,10 @@ pub(crate) mod tests {
 
     fn sample_ipv6_socket_address() -> SocketAddr {
         SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8080)
+    }
+
+    pub(crate) fn sample_cookie_valid_range() -> Range<f64> {
+        sample_issue_time() - 10.0..sample_issue_time() + 10.0
     }
 
     pub(crate) fn sample_issue_time() -> f64 {
