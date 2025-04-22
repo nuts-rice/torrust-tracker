@@ -237,6 +237,7 @@ pub mod logging;
 pub mod network;
 pub mod tracker_api;
 pub mod udp_tracker;
+pub mod udp_tracker_server;
 
 use std::fs;
 use std::net::IpAddr;
@@ -251,6 +252,7 @@ use self::health_check_api::HealthCheckApi;
 use self::http_tracker::HttpTracker;
 use self::tracker_api::HttpApi;
 use self::udp_tracker::UdpTracker;
+use self::udp_tracker_server::UdpTrackerServer;
 use crate::validator::{SemanticValidationError, Validator};
 use crate::{Error, Info, Metadata, Version};
 
@@ -279,6 +281,8 @@ pub struct Configuration {
     /// represents a UDP server that the tracker is running and it has its own
     /// configuration.
     pub udp_trackers: Option<Vec<UdpTracker>>,
+
+    pub udp_tracker_server: Option<UdpTrackerServer>,
 
     /// The list of HTTP trackers the tracker is running. Each HTTP tracker
     /// represents a HTTP server that the tracker is running and it has its own
