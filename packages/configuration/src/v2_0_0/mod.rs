@@ -282,6 +282,7 @@ pub struct Configuration {
     /// configuration.
     pub udp_trackers: Option<Vec<UdpTracker>>,
 
+    // Configuration for the UDP tracker server.
     pub udp_tracker_server: Option<UdpTrackerServer>,
 
     /// The list of HTTP trackers the tracker is running. Each HTTP tracker

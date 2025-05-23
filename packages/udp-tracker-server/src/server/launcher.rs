@@ -42,6 +42,7 @@ impl Launcher {
     pub async fn run_with_graceful_shutdown(
         udp_tracker_core_container: Arc<UdpTrackerCoreContainer>,
         udp_tracker_server_container: Arc<UdpTrackerServerContainer>,
+        ban_reset_interval: Duration,
         bind_to: SocketAddr,
         cookie_lifetime: Duration,
         tx_start: oneshot::Sender<Started>,
@@ -133,6 +134,7 @@ impl Launcher {
         udp_tracker_core_container: Arc<UdpTrackerCoreContainer>,
         udp_tracker_server_container: Arc<UdpTrackerServerContainer>,
         cookie_lifetime: Duration,
+        ban_reset_interval: Duration,
     ) {
         let active_requests = &mut ActiveRequests::default();
 
@@ -148,7 +150,7 @@ impl Launcher {
         let ban_cleaner = udp_tracker_core_container.ban_service.clone();
 
         tokio::spawn(async move {
-            let mut cleaner_interval = interval(Duration::from_secs(IP_BANS_RESET_INTERVAL_IN_SECS));
+            let mut cleaner_interval = interval(ban_reset_interval);
 
             cleaner_interval.tick().await;
 
