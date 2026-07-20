@@ -81,7 +81,7 @@ torrust-tracker-test-helpers = { version = "3.0.0", path = "packages/test-helper
 [workspace]
 members = [
   "console/tracker-client",
-  "contrib/dev-tools/analysis/workspace-coupling",
+  "contrib/dev-tools/analysis/workspace-coupling", "contrib/dev-tools/git/hooks-rs",
   "packages/e2e-tools",
   "packages/persistence-benchmark",
   "packages/rest-api-application",
