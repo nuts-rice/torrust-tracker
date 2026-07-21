@@ -1,12 +1,15 @@
-#!/usr/bin/env bash
+# Delegates to the torrust-git-hooks Rust binary. All hook output is NDJSON on stderr;
+# pass/fail is the binary's exit code.
 
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
 
-# Use human-friendly text format when stdout is a terminal; JSON for non-interactive / agent runs.
-if [[ -t 1 ]]; then
-    "$repo_root/contrib/dev-tools/git/hooks/pre-commit.sh" --format=text
-else
-    "$repo_root/contrib/dev-tools/git/hooks/pre-commit.sh" --format=json
-fi
+for profile in release debug; do
+    binary="${repo_root}/target/${profile}/torrust-git-hooks"
+    if [[ -x "${binary}" ]]; then
+        exec "${binary}" pre-commit --verbosity=concise
+    fi
+done
+
+cat >&2 <<'EOF'
